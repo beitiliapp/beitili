@@ -1,0 +1,5967 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+<meta name="theme-color" content="#3D1A2E"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="ביתילי"/>
+<title>ביתילי</title>
+<link rel="manifest" href="manifest.json"/>
+<link href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;600;700;800&family=Secular+One&family=Suez+One&display=swap" rel="stylesheet"/>
+<style>
+html,body{margin:0;padding:0;background:#3D1A2E;}
+#root{min-height:100vh;background:#FAF5EE;}
+#login-screen{
+  position:fixed;inset:0;z-index:999;
+  background:linear-gradient(135deg,#3D1A2E 0%,#6B2D4A 100%);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:28px;font-family:Rubik,sans-serif;
+}
+.login-title{font-family:"Secular One",sans-serif;font-size:40px;color:white;letter-spacing:2px;}
+.login-sub{font-size:13px;color:#D4AE5A;}
+.google-btn{
+  display:flex;align-items:center;gap:12px;background:white;color:#3D1A2E;
+  border:none;border-radius:30px;padding:15px 32px;font-size:15px;font-weight:700;
+  cursor:pointer;box-shadow:0 6px 24px rgba(0,0,0,0.4);font-family:Rubik,sans-serif;
+}
+.login-note{font-size:11px;color:rgba(255,255,255,0.4);text-align:center;line-height:1.9;}
+.spinner{width:34px;height:34px;border:3px solid rgba(212,174,90,0.2);border-top-color:#D4AE5A;border-radius:50%;animation:spin 0.7s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.status-txt{color:#D4AE5A;font-size:12px;}
+</style>
+<script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+</head>
+<body>
+
+<div id="login-screen">
+  <div class="login-title">ביתילי</div>
+  <div class="login-sub">מעקב טהרה אישי ומאובטח</div>
+  <div id="btn-area">
+    <button class="google-btn" onclick="doLogin()">
+      <svg width="20" height="20" viewBox="0 0 24 24">
+        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+      </svg>
+      כניסה עם Google
+    </button>
+  </div>
+  <div id="status-area"></div>
+  <div class="login-note">הנתונים שלך מאובטחים<br/>ומגובים בחשבון Google האישי שלך</div>
+</div>
+
+<div id="root"></div>
+
+<!-- React (no Babel needed — pre-compiled) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+
+<!-- Pre-compiled app (no Babel needed) -->
+<script>
+(function(){
+const {useState,useEffect,useRef}=React;
+function _extends() { return _extends = Object.assign ? Object.assign.bind() : function (n) { for (var e = 1; e < arguments.length; e++) { var t = arguments[e]; for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]); } return n; }, _extends.apply(null, arguments); }
+// ─────────────────────────────────────────────
+// CONSTANTS & HELPERS
+// ─────────────────────────────────────────────
+const HE_MONTHS = ["ינואר", "פברואר", "מרץ", "אפריל", "מאי", "יוני", "יולי", "אוגוסט", "ספטמבר", "אוקטובר", "נובמבר", "דצמבר"];
+function today() {
+  return new Date().toISOString().split("T")[0];
+}
+function addDays(d, n) {
+  const x = new Date(d);
+  x.setDate(x.getDate() + n);
+  return x.toISOString().split("T")[0];
+}
+function daysBetween(a, b) {
+  return Math.round((new Date(b) - new Date(a)) / 86400000);
+}
+function formatDate(d) {
+  if (!d) return "";
+  return new Date(d).toLocaleDateString("he-IL", {
+    day: "numeric",
+    month: "long",
+    year: "numeric"
+  });
+}
+function formatShort(d) {
+  if (!d) return "";
+  const x = new Date(d);
+  return `${x.getDate()}/${x.getMonth() + 1}`;
+}
+function getDaysInMonth(y, m) {
+  return new Date(y, m + 1, 0).getDate();
+}
+function getFirstDayOfMonth(y, m) {
+  return new Date(y, m, 1).getDay();
+} // 0=Sun...6=Sat
+
+const DEFAULT_SETTINGS = {
+  pinEnabled: false,
+  pin: "",
+  netz: "06:13",
+  shkia: "19:09",
+  morningReminder: "07:00",
+  eveningReminder: "19:00",
+  vesetReminder: "08:00",
+  vesetRemindersEnabled: false,
+  remindersEnabled: false,
+  city: "תל אביב"
+};
+const CITIES = {
+  "ירושלים": {
+    lat: 31.7683,
+    lng: 35.2137
+  },
+  "תל אביב": {
+    lat: 32.0853,
+    lng: 34.7818
+  },
+  "חיפה": {
+    lat: 32.7940,
+    lng: 34.9896
+  },
+  "באר שבע": {
+    lat: 31.2518,
+    lng: 34.7915
+  },
+  "אילת": {
+    lat: 29.5577,
+    lng: 34.9519
+  },
+  "צפת": {
+    lat: 32.9647,
+    lng: 35.4960
+  },
+  "נתניה": {
+    lat: 32.3215,
+    lng: 34.8532
+  },
+  "רחובות": {
+    lat: 31.8928,
+    lng: 34.8113
+  },
+  "מודיעין": {
+    lat: 31.8960,
+    lng: 35.0095
+  },
+  "אחר": {
+    lat: 31.5,
+    lng: 34.75
+  }
+};
+
+// Sun calculation (NOAA simplified algorithm)
+function calcSunTimes(lat, lng) {
+  const date = new Date();
+  const JD = date.getTime() / 86400000 + 2440587.5;
+  // NOAA algorithm: for east longitude, n uses +lng/360 and Js uses -lng/360
+  const n = Math.round(JD - 2451545.0 - 0.0009 + lng / 360);
+  const Js = 2451545.0 + 0.0009 - lng / 360 + n;
+  const Mr = (357.5291 + 0.98560028 * (Js - 2451545)) % 360 * Math.PI / 180;
+  const C = 1.9148 * Math.sin(Mr) + 0.02 * Math.sin(2 * Mr) + 0.0003 * Math.sin(3 * Mr);
+  const lr = (Mr * 180 / Math.PI + C + 180 + 102.9372) % 360 * Math.PI / 180;
+  const Jt = Js + 0.0053 * Math.sin(Mr) - 0.0069 * Math.sin(2 * lr);
+  const decl = Math.asin(Math.sin(lr) * Math.sin(23.4397 * Math.PI / 180));
+  const latr = lat * Math.PI / 180;
+  const cosW = (Math.sin(-0.8333 * Math.PI / 180) - Math.sin(latr) * Math.sin(decl)) / (Math.cos(latr) * Math.cos(decl));
+  if (Math.abs(cosW) > 1) return {
+    netz: "06:00",
+    shkia: "18:00"
+  };
+  const W = Math.acos(cosW) * 180 / Math.PI;
+  function jdToLocal(jd) {
+    const utc = new Date((jd - 2440587.5) * 86400000);
+    // Israel time = UTC+2 (standard) or UTC+3 (DST) — detect automatically
+    const offset = -utc.getTimezoneOffset(); // in minutes, from browser
+    const local = new Date(utc.getTime() + offset * 60000);
+    return String(local.getUTCHours()).padStart(2, "0") + ":" + String(local.getUTCMinutes()).padStart(2, "0");
+  }
+  return {
+    netz: jdToLocal(Jt - W / 360),
+    shkia: jdToLocal(Jt + W / 360)
+  };
+}
+const CYCLE_TYPES = [{
+  key: "regular",
+  icon: "moon",
+  label: "מחזור רגיל",
+  minBleed: 3,
+  maxBleed: 14,
+  defaultBleed: 5,
+  color: "#8a5c3a"
+}, {
+  key: "boy",
+  icon: "birth",
+  label: "לידת בן",
+  minBleed: 7,
+  maxBleed: 40,
+  defaultBleed: 14,
+  color: "#4060c0"
+}, {
+  key: "girl",
+  icon: "birth",
+  label: "לידת בת",
+  minBleed: 14,
+  maxBleed: 80,
+  defaultBleed: 21,
+  color: "#c04080"
+}];
+const mkCycle = (startDate, bleedStart, bleedCount, cycleType = "regular", onahStart = "day") => ({
+  id: Date.now(),
+  startDate,
+  bleedStart,
+  bleedCount,
+  cycleType,
+  onahStart,
+  // "day" | "night" — which onah the period started in
+  days: Array.from({
+    length: 7
+  }, (_, i) => ({
+    dayNum: i + 1,
+    date: addDays(startDate, i),
+    morning: null,
+    evening: null,
+    season: "day",
+    notes: "",
+    pesila: false
+  })),
+  mikvehDone: false,
+  mikvehDate: addDays(startDate, 6),
+  createdAt: today()
+});
+
+// ─────────────────────────────────────────────
+// HEBREW CALENDAR ENGINE
+// ─────────────────────────────────────────────
+const HEB_MONTHS = ["", "ניסן", "אייר", "סיוון", "תמוז", "אב", "אלול", "תשרי", "חשוון", "כסלו", "טבת", "שבט", "אדר", "אדר ב׳"];
+const HEB_DAYS = ["", "א׳", "ב׳", "ג׳", "ד׳", "ה׳", "ו׳", "ז׳", "ח׳", "ט׳", "י׳", "י״א", "י״ב", "י״ג", "י״ד", "ט״ו", "ט״ז", "י״ז", "י״ח", "י״ט", "כ׳", "כ״א", "כ״ב", "כ״ג", "כ״ד", "כ״ה", "כ״ו", "כ״ז", "כ״ח", "כ״ט", "ל׳"];
+
+// Anchor: January 1, 2024 (R.D. 738886) = 20 Tevet 5784
+const HEB_ANCHOR_RD = 738886;
+const HEB_ANCHOR = {
+  day: 20,
+  month: 10,
+  year: 5784
+};
+function isHebLeap(y) {
+  return (7 * y + 1) % 19 < 7;
+}
+function lastHebMonth(y) {
+  return isHebLeap(y) ? 13 : 12;
+}
+function daysInHebMonth(m, y) {
+  if ([1, 3, 5, 7, 11].includes(m)) return 30;
+  if ([2, 4, 6, 10, 13].includes(m)) return 29;
+  if (m === 8) {
+    const d = daysInHebYear(y);
+    return d % 10 === 5 ? 30 : 29;
+  }
+  if (m === 9) {
+    const d = daysInHebYear(y);
+    return d % 10 === 3 ? 29 : 30;
+  }
+  if (m === 12) return isHebLeap(y) ? 30 : 29;
+  return 30;
+}
+function hebElapsed(y) {
+  const me = Math.floor((235 * y - 234) / 19);
+  const p = 12084 + 13753 * me;
+  let d = me * 29 + Math.floor(p / 25920);
+  if (3 * (d + 1) % 7 < 3) d++;
+  return d;
+}
+function daysInHebYear(y) {
+  return hebElapsed(y + 1) - hebElapsed(y);
+}
+function gregToRD(y, m, d) {
+  return 365 * (y - 1) + Math.floor((y - 1) / 4) - Math.floor((y - 1) / 100) + Math.floor((y - 1) / 400) + Math.floor((367 * m - 362) / 12) + (m <= 2 ? 0 : y % 4 === 0 && y % 100 !== 0 || y % 400 === 0 ? -1 : -2) + d;
+}
+
+// Increment one day in Hebrew calendar
+function hebNextDay({
+  day,
+  month,
+  year
+}) {
+  const len = daysInHebMonth(month, year);
+  if (day < len) return {
+    day: day + 1,
+    month,
+    year
+  };
+  const nm = month === lastHebMonth(year) ? 1 : month + 1;
+  return {
+    day: 1,
+    month: nm,
+    year: nm === 1 ? year + 1 : year
+  };
+}
+
+// Convert Gregorian date string "YYYY-MM-DD" to Hebrew date object
+function gregToHeb(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const rd = gregToRD(y, m, d);
+  const diff = rd - HEB_ANCHOR_RD;
+  let heb = {
+    ...HEB_ANCHOR
+  };
+  if (diff >= 0) {
+    for (let i = 0; i < diff; i++) heb = hebNextDay(heb);
+  } else {
+    for (let i = 0; i < -diff; i++) {
+      if (heb.day > 1) {
+        heb = {
+          ...heb,
+          day: heb.day - 1
+        };
+      } else {
+        const pm = heb.month === 1 ? lastHebMonth(heb.year - 1) : heb.month - 1;
+        const py = heb.month === 1 ? heb.year - 1 : heb.year;
+        heb = {
+          day: daysInHebMonth(pm, py),
+          month: pm,
+          year: py
+        };
+      }
+    }
+  }
+  return heb;
+}
+
+// Cache per calendar month for performance
+const hebCache = {};
+function getHebForMonth(gy, gm) {
+  const key = `${gy}-${gm}`;
+  if (hebCache[key]) return hebCache[key];
+  const map = {};
+  const days = new Date(gy, gm + 1, 0).getDate();
+  for (let d = 1; d <= days; d++) {
+    const ds = `${gy}-${String(gm + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+    map[ds] = gregToHeb(ds);
+  }
+  hebCache[key] = map;
+  return map;
+}
+
+// Get Hebrew month name(s) for a Gregorian month (for calendar header)
+function getHebMonthsForGregMonth(y, m) {
+  const ds1 = `${y}-${String(m + 1).padStart(2, "0")}-01`;
+  const ds15 = `${y}-${String(m + 1).padStart(2, "0")}-15`;
+  const last = new Date(y, m + 1, 0).getDate();
+  const dsEnd = `${y}-${String(m + 1).padStart(2, "0")}-${String(last).padStart(2, "0")}`;
+  const h1 = gregToHeb(ds1);
+  const h15 = gregToHeb(ds15);
+  const hEnd = gregToHeb(dsEnd);
+  // Collect unique Hebrew months in order
+  const seen = new Set();
+  const months = [];
+  for (const h of [h1, h15, hEnd]) {
+    const key = `${h.month}-${h.year}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      months.push(HEB_MONTHS[h.month]);
+    }
+  }
+  return months.join(" — ");
+}
+
+// ─────────────────────────────────────────────
+// HALACHIC ENGINE
+// ─────────────────────────────────────────────
+function calcVesetWarnings(cycles, manualHaflagah) {
+  if (!cycles.length) return [];
+  const warnings = [];
+  const last = cycles[cycles.length - 1];
+  const onah = last.onahStart || "day"; // which onah the period started in
+
+  // 1. Onah Beinonit — day 30 from last period start
+  const beinonit = addDays(last.bleedStart, 29);
+  warnings.push({
+    date: beinonit,
+    type: "beinonit",
+    onah,
+    label: "עונה בינונית",
+    desc: `יום 30 מתחילת הווסת · עונת ${onah === "day" ? "יום" : "לילה"}`
+  });
+
+  // 2. Veset HaHaflagah — calculate from all available cycle pairs
+  if (cycles.length >= 2) {
+    // Use the two most recent cycles
+    const prev = cycles[cycles.length - 2];
+    const interval = daysBetween(prev.bleedStart, last.bleedStart);
+    const haflagahDate = addDays(last.bleedStart, interval);
+    warnings.push({
+      date: haflagahDate,
+      type: "haflagah",
+      onah,
+      label: "וסת ההפלגה",
+      desc: `הפלגה של ${interval} ימים · עונת ${onah === "day" ? "יום" : "לילה"}`
+    });
+
+    // If 3+ cycles exist, also calculate from prev pair to verify pattern
+    if (cycles.length >= 3) {
+      const prevPrev = cycles[cycles.length - 3];
+      const prevInterval = daysBetween(prevPrev.bleedStart, prev.bleedStart);
+      if (prevInterval !== interval) {
+        // Different interval — show both as candidates
+        const prevHaflagahDate = addDays(last.bleedStart, prevInterval);
+        if (prevHaflagahDate !== haflagahDate) {
+          warnings.push({
+            date: prevHaflagahDate,
+            type: "haflagah",
+            onah,
+            label: "וסת ההפלגה (מחזור קודם)",
+            desc: `הפלגה של ${prevInterval} ימים · עונת ${onah === "day" ? "יום" : "לילה"}`
+          });
+        }
+      }
+    }
+  }
+
+  // 2b. Manual haflagah (when only 1 cycle exists)
+  if (manualHaflagah && cycles.length < 2) {
+    warnings.push({
+      date: manualHaflagah.date,
+      type: "haflagah",
+      onah: manualHaflagah.onah || onah,
+      label: "וסת ההפלגה",
+      desc: `הפלגה של ${manualHaflagah.days} ימים (ידני) · עונת ${(manualHaflagah.onah || onah) === "day" ? "יום" : "לילה"}`
+    });
+  }
+
+  // 3. Veset HaChodesh — same Hebrew day of month (next Gregorian month as approximation)
+  const lastBleedDay = new Date(last.bleedStart).getDate();
+  const bleedDate = new Date(last.bleedStart);
+  const nextMonth = new Date(bleedDate.getFullYear(), bleedDate.getMonth() + 1, lastBleedDay);
+  const chodeshDate = nextMonth.toISOString().split("T")[0];
+  const hebBleed = gregToHeb(last.bleedStart);
+  warnings.push({
+    date: chodeshDate,
+    type: "chodesh",
+    onah,
+    label: "וסת החודש",
+    desc: `יום ${HEB_DAYS[hebBleed.day]} ${HEB_MONTHS[hebBleed.month]} (קירוב) · עונת ${onah === "day" ? "יום" : "לילה"}`
+  });
+
+  // deduplicate by date+type
+  const seen = new Set();
+  return warnings.filter(w => {
+    const k = w.date + w.type;
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  }).sort((a, b) => a.date.localeCompare(b.date));
+}
+function getCycleDates(cycle) {
+  const map = {};
+  for (let i = 0; i < cycle.bleedCount; i++) map[addDays(cycle.bleedStart, i)] = {
+    type: "bleed"
+  };
+  // Hefsek tahara = day before first clean day
+  const hefsekDate = addDays(cycle.startDate, -1);
+  if (!map[hefsekDate]) map[hefsekDate] = {
+    type: "hefsek"
+  };
+  cycle.days.forEach((day, i) => {
+    const isClean = day.morning === "clean" && day.evening === "clean";
+    const hasStain = day.morning === "stain" || day.evening === "stain";
+    map[day.date] = {
+      type: "clean",
+      dayNum: i + 1,
+      isClean,
+      hasStain
+    };
+  });
+  map[cycle.mikvehDate] = {
+    type: "mikveh",
+    done: cycle.mikvehDone
+  };
+  return map;
+}
+
+// ─────────────────────────────────────────────
+// MAIN APP
+// ─────────────────────────────────────────────
+function App() {
+  const [cycles, setCycles] = useState([]);
+  const [specialEvents, setSpecialEvents] = useState([]);
+  const [settings, setSettings] = useState(DEFAULT_SETTINGS);
+  const [activeCycleId, setActiveCycleId] = useState(null);
+  const [view, setView] = useState("calendar");
+  const [loaded, setLoaded] = useState(false);
+  const [pinUnlocked, setPinUnlocked] = useState(false);
+  const [showNewCycle, setShowNewCycle] = useState(false);
+  const [form, setForm] = useState({
+    bleedStart: addDays(today(), -5),
+    bleedCount: 5,
+    cycleType: "regular",
+    manualStart: "",
+    hefsekDate: "",
+    onahStart: "day"
+  });
+  const [calMonth, setCalMonth] = useState({
+    y: new Date().getFullYear(),
+    m: new Date().getMonth()
+  });
+  const [manualHaflagah, setManualHaflagah] = useState(null);
+  const STORAGE_KEY = "tahara-v3";
+
+  // Auto-update sun times daily
+  function refreshSunTimes(cityName, currentSettings) {
+    const c = CITIES[cityName || currentSettings.city];
+    if (c && c.lat) {
+      const t = calcSunTimes(c.lat, c.lng);
+      setSettings(s => ({
+        ...s,
+        netz: t.netz,
+        shkia: t.shkia,
+        city: cityName || s.city
+      }));
+    }
+  }
+  useEffect(() => {
+    async function load() {
+      try {
+        const res = await Promise.resolve({value: localStorage.getItem(STORAGE_KEY)});
+        if (res !== null && res !== void 0 && res.value) {
+          const d = JSON.parse(res.value);
+          setCycles(d.cycles || []);
+          setSpecialEvents(d.specialEvents || []);
+          setActiveCycleId(d.activeCycleId || null);
+          if (d.settings) {
+            const merged = {
+              ...DEFAULT_SETTINGS,
+              ...d.settings
+            };
+            setSettings(merged);
+            // Recalculate sun times for today
+            const c = CITIES[merged.city];
+            if (c !== null && c !== void 0 && c.lat) {
+              const t = calcSunTimes(c.lat, c.lng);
+              setSettings(s => ({
+                ...s,
+                netz: t.netz,
+                shkia: t.shkia
+              }));
+            }
+          }
+        } else {
+          // First run — calculate for default city
+          const c = CITIES[DEFAULT_SETTINGS.city];
+          if (c !== null && c !== void 0 && c.lat) {
+            const t = calcSunTimes(c.lat, c.lng);
+            setSettings(s => ({
+              ...s,
+              netz: t.netz,
+              shkia: t.shkia
+            }));
+          }
+        }
+      } catch {}
+      setLoaded(true);
+    }
+    load();
+  }, []);
+  useEffect(() => {
+    if (!loaded) return;
+    try{localStorage.setItem(STORAGE_KEY,JSON.stringify({cycles,specialEvents,activeCycleId,settings}));}catch(e){}
+  }, [cycles, specialEvents, activeCycleId, settings, loaded]);
+  const activeCycle = cycles.find(c => c.id === activeCycleId) || cycles[cycles.length - 1] || null;
+  const vesetWarnings = calcVesetWarnings(cycles, manualHaflagah);
+  function createCycle() {
+    const hefsekAuto = addDays(form.bleedStart, form.bleedCount - 1);
+    const hefsekDate = form.hefsekDate || hefsekAuto;
+    const autoStart = addDays(hefsekDate, 1);
+    const startDate = form.manualStart || autoStart;
+    const c = mkCycle(startDate, form.bleedStart, form.bleedCount, form.cycleType, form.onahStart);
+    setCycles(p => [...p, c]);
+    setActiveCycleId(c.id);
+    setShowNewCycle(false);
+    setView("days");
+  }
+  function updateDay(cycleId, dayIdx, field, value) {
+    setCycles(p => p.map(c => c.id !== cycleId ? c : {
+      ...c,
+      days: c.days.map((d, i) => i === dayIdx ? {
+        ...d,
+        [field]: value
+      } : d)
+    }));
+  }
+  function updateCycle(cycleId, field, value) {
+    setCycles(p => p.map(c => c.id === cycleId ? {
+      ...c,
+      [field]: value
+    } : c));
+  }
+  function addSpecialEvent(ev) {
+    setSpecialEvents(p => [...p.filter(e => !(e.date === ev.date && e.type === ev.type)), ev]);
+  }
+  function deleteSpecialEvent(id) {
+    setSpecialEvents(p => p.filter(e => e.id !== id));
+  }
+  function getCycleStatus(cycle) {
+    if (!cycle) return "none";
+    const allClean = cycle.days.every(d => d.morning === "clean" && d.evening === "clean");
+    const hasStain = cycle.days.some(d => d.morning === "stain" || d.evening === "stain");
+    if (hasStain) return "stain";
+    if (allClean && cycle.mikvehDone) return "complete";
+    if (allClean) return "ready";
+    return "ongoing";
+  }
+  function exportData() {
+    const blob = new Blob([JSON.stringify({
+      cycles,
+      settings
+    }, null, 2)], {
+      type: "application/json"
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "tahara-backup.json";
+    a.click();
+  }
+  function importData(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      try {
+        const d = JSON.parse(ev.target.result);
+        if (d.cycles) {
+          setCycles(d.cycles);
+          if (d.settings) setSettings({
+            ...DEFAULT_SETTINGS,
+            ...d.settings
+          });
+          alert("הגיבוי שוחזר בהצלחה ✅");
+        }
+      } catch {
+        alert("קובץ לא תקין");
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  // PIN lock
+  if (loaded && settings.pinEnabled && !pinUnlocked) {
+    return /*#__PURE__*/React.createElement(PINScreen, {
+      pin: settings.pin,
+      onUnlock: () => setPinUnlocked(true)
+    });
+  }
+  const st = getCycleStatus(activeCycle);
+  const TABS = [{
+    key: "calendar",
+    label: "לוח"
+  }, {
+    key: "days",
+    label: "ספירה"
+  }, {
+    key: "veset",
+    label: "וסתות"
+  }, {
+    key: "settings",
+    label: "הגדרות"
+  }];
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      minHeight: "100vh",
+      background: "var(--bg)",
+      fontFamily: "'Rubik',sans-serif",
+      direction: "rtl",
+      color: "var(--text)"
+    }
+  }, /*#__PURE__*/React.createElement("style", null, `
+        @import url('https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;600;700;800&family=Secular+One&family=Suez+One&display=swap');
+        :root{
+          --bg:#FAF5EE; --bg2:#F0E8DC; --bg3:#EDE0D2;
+          --primary:#3D1A2E; --primary-mid:#6B2D4A; --primary-light:#A0547A;
+          --gold:#B8922A; --gold-light:#D4AE5A; --gold-bg:#FDF6E3;
+          --green:#3A6B50; --green-mid:#5A9B72; --green-bg:#EBF5EE;
+          --red:#8B2828; --red-mid:#C04040; --red-bg:#FFF0F0;
+          --blue:#2A4070; --blue-bg:#EEF0FF;
+          --purple:#804090; --purple-bg:#F6EEFF;
+          --text:#2A1508; --text-mid:#6B5040; --text-light:#9A8070;
+          --border:#E8D8C4; --border-light:#F0E8DA;
+          --card:#FFFCF8; --shadow:rgba(42,21,8,0.10);
+          --radius:16px; --radius-sm:10px;
+        }
+        *{box-sizing:border-box;margin:0;padding:0;}
+        body{background:var(--bg);}
+        ::-webkit-scrollbar{width:4px;}
+        ::-webkit-scrollbar-thumb{background:var(--gold-light);border-radius:4px;}
+        button,input,textarea,select{font-family:'Rubik',sans-serif;}
+        .fade-in{animation:fadeIn 0.28s cubic-bezier(.16,1,.3,1);}
+        @keyframes fadeIn{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:none;}}
+        .slide-up{animation:slideUp 0.32s cubic-bezier(.16,1,.3,1);}
+        @keyframes slideUp{from{opacity:0;transform:translateY(20px);}to{opacity:1;transform:none;}}
+        .pop{animation:pop 0.2s cubic-bezier(.34,1.56,.64,1);}
+        @keyframes pop{from{transform:scale(0.92);}to{transform:scale(1);}}
+        .card{background:var(--card);border-radius:var(--radius);border:1px solid var(--border);box-shadow:0 2px 16px var(--shadow);}
+        .btn-primary{background:linear-gradient(135deg,var(--primary-mid),var(--primary));color:white;border:none;border-radius:var(--radius-sm);font-weight:700;cursor:pointer;transition:filter 0.15s,transform 0.15s;}
+        .btn-primary:active{filter:brightness(0.9);transform:scale(0.98);}
+        .btn-ghost{background:transparent;border:2px solid var(--border);color:var(--text-mid);border-radius:var(--radius-sm);font-weight:600;cursor:pointer;}
+        .btn-ghost:active{background:var(--bg2);}
+        input[type=range]{-webkit-appearance:none;height:5px;border-radius:3px;background:var(--border);outline:none;width:100%;}
+        input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;border-radius:50%;background:linear-gradient(135deg,var(--primary-mid),var(--primary));cursor:pointer;box-shadow:0 2px 8px rgba(107,45,74,0.35);}
+        select{-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236B5040' stroke-width='2' fill='none'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:left 12px center;}
+      `), /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "linear-gradient(150deg,var(--primary) 0%,var(--primary-mid) 100%)",
+      padding: "20px 20px 16px",
+      textAlign: "center",
+      boxShadow: "0 4px 32px rgba(42,21,8,0.28)",
+      position: "relative",
+      overflow: "hidden"
+    }
+  }, /*#__PURE__*/React.createElement("svg", {
+    style: {
+      position: "absolute",
+      top: -10,
+      left: "50%",
+      transform: "translateX(-50%)",
+      opacity: 0.04,
+      pointerEvents: "none"
+    },
+    width: "200",
+    height: "80",
+    viewBox: "0 0 200 80"
+  }, /*#__PURE__*/React.createElement("text", {
+    x: "100",
+    y: "60",
+    textAnchor: "middle",
+    fontSize: "72",
+    fontFamily: "serif",
+    fill: "white"
+  }, "\u2726")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 9,
+      color: "var(--gold-light)",
+      letterSpacing: 5,
+      fontWeight: 400,
+      marginBottom: 5,
+      textTransform: "uppercase",
+      opacity: 0.85
+    }
+  }, "\u05DE\u05E2\u05E7\u05D1 \u05D8\u05D4\u05E8\u05D4 \u05D0\u05D9\u05E9\u05D9"), /*#__PURE__*/React.createElement("h1", {
+    style: {
+      fontFamily: "'Secular One',sans-serif",
+      fontSize: 28,
+      fontWeight: 900,
+      color: "white",
+      letterSpacing: 1.5,
+      marginBottom: 10,
+      textShadow: "0 2px 12px rgba(0,0,0,0.2)"
+    }
+  }, "\u05D1\u05D9\u05EA\u05D9\u05DC\u05D9"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "center",
+      gap: 6,
+      alignItems: "center",
+      flexWrap: "wrap"
+    }
+  }, activeCycle && (() => {
+    const pills = {
+      complete: {
+        bg: "rgba(58,107,80,0.6)",
+        c: "#b0f0c8",
+        t: "הושלם"
+      },
+      ready: {
+        bg: "rgba(42,64,112,0.6)",
+        c: "#b0c8ff",
+        t: "מוכן לטבילה"
+      },
+      stain: {
+        bg: "rgba(139,40,40,0.6)",
+        c: "#ffb0b0",
+        t: "נמצא כתם"
+      },
+      ongoing: {
+        bg: "rgba(255,255,255,0.12)",
+        c: "rgba(255,255,255,0.75)",
+        t: `${activeCycle.days.filter(d => d.morning && d.evening).length} / 7 ימים`
+      }
+    };
+    const p = pills[st] || pills.ongoing;
+    return /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 11,
+        background: p.bg,
+        color: p.c,
+        borderRadius: 20,
+        padding: "3px 10px",
+        border: "1px solid rgba(255,255,255,0.15)",
+        fontWeight: 600
+      }
+    }, p.t);
+  })(), vesetWarnings.some(w => w.date === today()) && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      background: "rgba(200,60,60,0.55)",
+      color: "#ffd0d0",
+      borderRadius: 20,
+      padding: "3px 10px",
+      border: "1px solid rgba(200,60,60,0.4)",
+      fontWeight: 600
+    }
+  }, "\u26A0 \u05D5\u05E1\u05EA \u05D4\u05D9\u05D5\u05DD"))), showNewCycle && /*#__PURE__*/React.createElement(NewCycleForm, {
+    form: form,
+    setForm: setForm,
+    onCreate: createCycle,
+    onCancel: () => setShowNewCycle(false)
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      paddingBottom: 108
+    }
+  }, view === "calendar" && /*#__PURE__*/React.createElement(CalendarView, {
+    cycles: cycles,
+    specialEvents: specialEvents,
+    addSpecialEvent: addSpecialEvent,
+    deleteSpecialEvent: deleteSpecialEvent,
+    calMonth: calMonth,
+    setCalMonth: setCalMonth,
+    activeCycle: activeCycle,
+    todayStr: today(),
+    setView: setView,
+    setShowNewCycle: setShowNewCycle,
+    vesetWarnings: vesetWarnings
+  }), view === "days" && (activeCycle ? /*#__PURE__*/React.createElement(DaysView, {
+    cycle: activeCycle,
+    updateDay: updateDay,
+    updateCycle: updateCycle,
+    setCycles: setCycles,
+    getCycleStatus: getCycleStatus,
+    settings: settings,
+    onDelete: () => {
+      setCycles(p => p.filter(c => c.id !== activeCycle.id));
+      setActiveCycleId(null);
+      setView("calendar");
+    }
+  }) : /*#__PURE__*/React.createElement(Empty, {
+    icon: "\u25CC",
+    text: "\u05D0\u05D9\u05DF \u05DE\u05D7\u05D6\u05D5\u05E8 \u05E4\u05E2\u05D9\u05DC",
+    sub: "\u05DC\u05D7\u05E6\u05D9 \u05E2\u05DC \uFF0B \u05DC\u05D4\u05D5\u05E1\u05D9\u05E3 \u05DE\u05D7\u05D6\u05D5\u05E8 \u05D7\u05D3\u05E9"
+  })), view === "veset" && /*#__PURE__*/React.createElement(VesetView, {
+    warnings: vesetWarnings,
+    cycles: cycles,
+    setManualHaflagah: h => setManualHaflagah(h)
+  }), view === "settings" && /*#__PURE__*/React.createElement(SettingsView, {
+    settings: settings,
+    setSettings: setSettings,
+    exportData: exportData,
+    importData: importData,
+    setPinUnlocked: setPinUnlocked,
+    cycles: cycles,
+    refreshSunTimes: refreshSunTimes
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "fixed",
+      bottom: 0,
+      right: 0,
+      left: 0,
+      zIndex: 100
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "center",
+      marginBottom: 8
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => setShowNewCycle(v => !v),
+    style: {
+      width: 52,
+      height: 52,
+      borderRadius: "50%",
+      border: "none",
+      cursor: "pointer",
+      background: showNewCycle ? "linear-gradient(135deg,var(--red-mid),var(--red))" : "linear-gradient(135deg,var(--gold-light),var(--gold))",
+      boxShadow: showNewCycle ? "0 4px 20px rgba(139,40,40,0.45)" : "0 4px 20px rgba(184,146,42,0.5)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      transition: "all 0.25s cubic-bezier(.34,1.56,.64,1)",
+      transform: showNewCycle ? "rotate(45deg)" : "rotate(0deg)"
+    }
+  }, /*#__PURE__*/React.createElement(TabIcon, {
+    name: "plus",
+    color: "white",
+    size: 22
+  }))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "rgba(250,245,238,0.96)",
+      backdropFilter: "blur(24px)",
+      WebkitBackdropFilter: "blur(24px)",
+      borderTop: "1px solid var(--border)",
+      display: "flex",
+      padding: "8px 0 calc(8px + env(safe-area-inset-bottom,0px))",
+      boxShadow: "0 -8px 32px rgba(42,21,8,0.08)"
+    }
+  }, TABS.map(t => {
+    const active = view === t.key;
+    const hasAlert = t.key === "veset" && vesetWarnings.some(w => w.date === today());
+    return /*#__PURE__*/React.createElement("button", {
+      key: t.key,
+      onClick: () => setView(t.key),
+      style: {
+        flex: 1,
+        background: "none",
+        border: "none",
+        cursor: "pointer",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        gap: 3,
+        padding: "4px 0",
+        position: "relative"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        width: 42,
+        height: 32,
+        borderRadius: 12,
+        background: active ? "linear-gradient(135deg,var(--primary-mid),var(--primary))" : "transparent",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        transition: "all 0.2s cubic-bezier(.34,1.56,.64,1)",
+        transform: active ? "scale(1.05)" : "scale(1)"
+      }
+    }, /*#__PURE__*/React.createElement(TabIcon, {
+      name: t.key,
+      color: active ? "white" : "var(--text-light)",
+      size: 18
+    })), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 10,
+        fontWeight: active ? 700 : 400,
+        color: active ? "var(--primary-mid)" : "var(--text-light)",
+        letterSpacing: 0.3,
+        transition: "color 0.2s"
+      }
+    }, t.label), hasAlert && /*#__PURE__*/React.createElement("div", {
+      style: {
+        position: "absolute",
+        top: 2,
+        right: "22%",
+        width: 7,
+        height: 7,
+        borderRadius: "50%",
+        background: "var(--red-mid)",
+        border: "2px solid var(--bg)"
+      }
+    }));
+  }))));
+}
+
+// ─── TAB ICONS (custom SVG) ──────────────────
+function TabIcon({
+  name,
+  color,
+  size = 20
+}) {
+  const s = size,
+    sw = size > 18 ? 1.8 : 1.6;
+  const props = {
+    fill: "none",
+    stroke: color,
+    strokeWidth: sw,
+    strokeLinecap: "round",
+    strokeLinejoin: "round"
+  };
+  if (name === "calendar") return /*#__PURE__*/React.createElement("svg", _extends({
+    width: s,
+    height: s,
+    viewBox: "0 0 24 24"
+  }, props), /*#__PURE__*/React.createElement("rect", {
+    x: "3",
+    y: "4",
+    width: "18",
+    height: "17",
+    rx: "3.5",
+    fill: "none"
+  }), /*#__PURE__*/React.createElement("line", {
+    x1: "3",
+    y1: "9",
+    x2: "21",
+    y2: "9"
+  }), /*#__PURE__*/React.createElement("line", {
+    x1: "8",
+    y1: "2",
+    x2: "8",
+    y2: "6"
+  }), /*#__PURE__*/React.createElement("line", {
+    x1: "16",
+    y1: "2",
+    x2: "16",
+    y2: "6"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M16 13.5 a2 2 0 0 0 0 4 2.8 2.8 0 0 1 0-4z",
+    fill: color,
+    stroke: "none"
+  }), /*#__PURE__*/React.createElement("circle", {
+    cx: "7.5",
+    cy: "14",
+    r: "1",
+    fill: color,
+    stroke: "none"
+  }), /*#__PURE__*/React.createElement("circle", {
+    cx: "7.5",
+    cy: "18",
+    r: "1",
+    fill: color,
+    stroke: "none"
+  }), /*#__PURE__*/React.createElement("circle", {
+    cx: "12",
+    cy: "18",
+    r: "1",
+    fill: color,
+    stroke: "none"
+  }));
+  if (name === "days") return /*#__PURE__*/React.createElement("svg", _extends({
+    width: s,
+    height: s,
+    viewBox: "0 0 24 24"
+  }, props), /*#__PURE__*/React.createElement("path", {
+    d: "M12 3 C12 3 5 10 5 15 a7 7 0 0 0 14 0 C19 10 12 3 12 3z"
+  }), /*#__PURE__*/React.createElement("line", {
+    x1: "9",
+    y1: "12",
+    x2: "15",
+    y2: "12",
+    strokeWidth: sw * 1.1
+  }), /*#__PURE__*/React.createElement("line", {
+    x1: "12",
+    y1: "12",
+    x2: "12",
+    y2: "18",
+    strokeWidth: sw * 1.1
+  }));
+  if (name === "veset") return /*#__PURE__*/React.createElement("svg", _extends({
+    width: s,
+    height: s,
+    viewBox: "0 0 24 24"
+  }, props), /*#__PURE__*/React.createElement("path", {
+    d: "M12 4 a8 8 0 1 1 0 16 a8 8 0 0 1 0-16",
+    strokeDasharray: "38 8"
+  }), /*#__PURE__*/React.createElement("polyline", {
+    points: "15,3.5 12,4 13.5,7"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M12 8 a4 4 0 0 0 0 8 5 5 0 0 1 0-8z",
+    fill: color,
+    stroke: "none",
+    opacity: "0.7"
+  }));
+  if (name === "settings") return /*#__PURE__*/React.createElement("svg", _extends({
+    width: s,
+    height: s,
+    viewBox: "0 0 24 24"
+  }, props), [0, 60, 120, 180, 240, 300].map((deg, i) => {
+    const r = Math.PI * deg / 180;
+    const cx = 12 + 4.5 * Math.cos(r),
+      cy = 12 + 4.5 * Math.sin(r);
+    return /*#__PURE__*/React.createElement("ellipse", {
+      key: i,
+      cx: cx,
+      cy: cy,
+      rx: "2.8",
+      ry: "1.8",
+      transform: `rotate(${deg} ${cx} ${cy})`,
+      fill: "none",
+      stroke: color,
+      strokeWidth: sw
+    });
+  }), /*#__PURE__*/React.createElement("circle", {
+    cx: "12",
+    cy: "12",
+    r: "2",
+    fill: color,
+    stroke: "none"
+  }));
+  if (name === "plus") return /*#__PURE__*/React.createElement("svg", {
+    width: s,
+    height: s,
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: color,
+    strokeWidth: 2.4,
+    strokeLinecap: "round"
+  }, /*#__PURE__*/React.createElement("line", {
+    x1: "12",
+    y1: "5",
+    x2: "12",
+    y2: "19"
+  }), /*#__PURE__*/React.createElement("line", {
+    x1: "5",
+    y1: "12",
+    x2: "19",
+    y2: "12"
+  }));
+  return null;
+}
+
+// ─── PIN SCREEN ───────────────────────────────
+function PINScreen({
+  pin,
+  onUnlock
+}) {
+  const [entered, setEntered] = useState("");
+  const [error, setError] = useState(false);
+  function press(d) {
+    if (entered.length >= 4) return;
+    const next = entered + d;
+    setEntered(next);
+    setError(false);
+    if (next.length === 4) {
+      if (next === pin) {
+        onUnlock();
+      } else {
+        setError(true);
+        setTimeout(() => setEntered(""), 600);
+      }
+    }
+  }
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      minHeight: "100vh",
+      background: "linear-gradient(135deg,#3D1A2E,#6B2D4A)",
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 24,
+      fontFamily: "'Rubik',sans-serif",
+      direction: "ltr"
+    }
+  }, /*#__PURE__*/React.createElement("style", null, `@import url('https://fonts.googleapis.com/css2?family=Rubik:wght@400;600;700&family=Secular+One&display=swap');`), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: "'Secular One',sans-serif",
+      fontSize: 28,
+      fontWeight: 700,
+      color: "white",
+      letterSpacing: 1,
+      direction: "rtl"
+    }
+  }, "\u05D1\u05D9\u05EA\u05D9\u05DC\u05D9"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 14,
+      color: "#D4AE5A",
+      direction: "rtl"
+    }
+  }, "\u05D4\u05DB\u05E0\u05D9\u05E1\u05D9 \u05E7\u05D5\u05D3 \u05D2\u05D9\u05E9\u05D4"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 14,
+      direction: "ltr"
+    }
+  }, [0, 1, 2, 3].map(i => /*#__PURE__*/React.createElement("div", {
+    key: i,
+    style: {
+      width: 16,
+      height: 16,
+      borderRadius: "50%",
+      background: entered.length > i ? error ? "#e07070" : "white" : "transparent",
+      border: "2px solid rgba(255,255,255,0.6)",
+      transition: "all 0.2s"
+    }
+  }))), error && /*#__PURE__*/React.createElement("div", {
+    style: {
+      color: "#ff9090",
+      fontSize: 13,
+      direction: "rtl"
+    }
+  }, "\u05E7\u05D5\u05D3 \u05E9\u05D2\u05D5\u05D9, \u05E0\u05E1\u05D9 \u05E9\u05E0\u05D9\u05EA"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "grid",
+      gridTemplateColumns: "repeat(3,72px)",
+      gap: 14,
+      direction: "ltr"
+    }
+  }, [1, 2, 3, 4, 5, 6, 7, 8, 9, "", 0, "⌫"].map((d, i) => /*#__PURE__*/React.createElement("button", {
+    key: i,
+    onClick: () => {
+      if (d === "⌫") setEntered(e => e.slice(0, -1));else if (d !== "") press(String(d));
+    },
+    style: {
+      width: 72,
+      height: 72,
+      borderRadius: "50%",
+      background: d === "" ? "transparent" : "rgba(255,255,255,0.15)",
+      border: d === "" ? "none" : "2px solid rgba(255,255,255,0.3)",
+      color: "white",
+      fontSize: d === "⌫" ? 22 : 24,
+      fontWeight: 600,
+      cursor: d === "" ? "default" : "pointer",
+      transition: "background 0.15s"
+    }
+  }, d))));
+}
+
+// ─── NEW CYCLE FORM ──────────────────────────
+function NewCycleForm({
+  form,
+  setForm,
+  onCreate,
+  onCancel
+}) {
+  const typeInfo = CYCLE_TYPES.find(t => t.key === form.cycleType) || CYCLE_TYPES[0];
+  const autoStart = addDays(form.bleedStart, form.bleedCount);
+  // hefsek tahara date: either explicitly set, or last day of bleeding
+  const hefsekAuto = addDays(form.bleedStart, form.bleedCount - 1);
+  const hefsekDate = form.hefsekDate || hefsekAuto;
+  // counting starts day after hefsek, unless manually overridden
+  const countStart = form.manualStart || addDays(hefsekDate, 1);
+  const mikvehDate = addDays(countStart, 6);
+  function setType(key) {
+    const t = CYCLE_TYPES.find(x => x.key === key);
+    setForm(f => ({
+      ...f,
+      cycleType: key,
+      bleedCount: t.defaultBleed,
+      manualStart: "",
+      hefsekDate: "",
+      onahStart: "day"
+    }));
+  }
+  return /*#__PURE__*/React.createElement("div", {
+    className: "card slide-up",
+    style: {
+      margin: "14px",
+      padding: "18px",
+      borderTop: "3px solid var(--gold)"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      fontFamily: "'Secular One',sans-serif",
+      fontSize: 19,
+      fontWeight: 700,
+      color: "var(--primary)",
+      marginBottom: 14,
+      letterSpacing: 0.3
+    }
+  }, /*#__PURE__*/React.createElement(AppIcon, {
+    name: typeInfo.key === "regular" ? "moon" : "birth",
+    color: "var(--primary-mid)",
+    size: 22
+  }), "\u05DE\u05D7\u05D6\u05D5\u05E8 \u05D7\u05D3\u05E9"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      marginBottom: 14
+    }
+  }, CYCLE_TYPES.map(t => /*#__PURE__*/React.createElement("button", {
+    key: t.key,
+    onClick: () => setType(t.key),
+    style: {
+      flex: 1,
+      padding: "8px 4px",
+      borderRadius: 11,
+      cursor: "pointer",
+      border: `2px solid ${form.cycleType === t.key ? t.color : "#d4c5b0"}`,
+      background: form.cycleType === t.key ? t.color + "18" : "#fdf6ef",
+      color: form.cycleType === t.key ? t.color : "#7a5c44",
+      fontWeight: form.cycleType === t.key ? 700 : 400,
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      gap: 3
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center"
+    }
+  }, t.key === "regular" ? /*#__PURE__*/React.createElement(AppIcon, {
+    name: "moon",
+    color: form.cycleType === t.key ? t.color : "var(--text-light)",
+    size: 20
+  }) : t.key === "boy" ? /*#__PURE__*/React.createElement(AppIcon, {
+    name: "birth",
+    color: form.cycleType === t.key ? t.color : "var(--text-light)",
+    size: 20
+  }) : /*#__PURE__*/React.createElement(AppIcon, {
+    name: "birth",
+    color: form.cycleType === t.key ? t.color : "var(--text-light)",
+    size: 20
+  })), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 10,
+      textAlign: "center"
+    }
+  }, t.label)))), /*#__PURE__*/React.createElement("label", {
+    style: {
+      display: "block",
+      fontSize: 13,
+      color: "#7a5c44",
+      fontWeight: 500,
+      marginBottom: 5
+    }
+  }, typeInfo.key === "regular" ? "תאריך תחילת דימום:" : "תאריך לידה / תחילת דימום:"), /*#__PURE__*/React.createElement("input", {
+    type: "date",
+    value: form.bleedStart,
+    onChange: e => setForm(f => ({
+      ...f,
+      bleedStart: e.target.value,
+      manualStart: "",
+      hefsekDate: ""
+    })),
+    style: {
+      width: "100%",
+      padding: "9px 12px",
+      borderRadius: 10,
+      border: "1.5px solid var(--border)",
+      background: "var(--bg)",
+      fontSize: 15,
+      outline: "none",
+      direction: "ltr",
+      color: "var(--text)",
+      marginBottom: 14
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 6
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 13,
+      color: "#7a5c44",
+      fontWeight: 500
+    }
+  }, "\u05DE\u05E1\u05E4\u05E8 \u05D9\u05DE\u05D9 \u05D3\u05D9\u05DE\u05D5\u05DD:"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontWeight: 800,
+      fontSize: 20,
+      color: "#c04040"
+    }
+  }, form.bleedCount)), /*#__PURE__*/React.createElement("input", {
+    type: "range",
+    min: typeInfo.minBleed,
+    max: typeInfo.maxBleed,
+    value: form.bleedCount,
+    onChange: e => setForm(f => ({
+      ...f,
+      bleedCount: Number(e.target.value),
+      manualStart: "",
+      hefsekDate: ""
+    })),
+    style: {
+      width: "100%",
+      accentColor: typeInfo.color,
+      marginBottom: 6
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      fontSize: 11,
+      color: "#b09070",
+      marginBottom: 10
+    }
+  }, /*#__PURE__*/React.createElement("span", null, typeInfo.minBleed), /*#__PURE__*/React.createElement("span", null, typeInfo.maxBleed)), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 5,
+      flexWrap: "wrap",
+      marginBottom: 14
+    }
+  }, (typeInfo.key === "regular" ? [3, 4, 5, 6, 7, 8, 9, 10, 11, 12] : typeInfo.key === "boy" ? [7, 14, 21, 28, 33, 40] : [14, 21, 28, 40, 60, 80]).map(n => /*#__PURE__*/React.createElement("button", {
+    key: n,
+    onClick: () => setForm(f => ({
+      ...f,
+      bleedCount: n,
+      manualStart: "",
+      hefsekDate: ""
+    })),
+    style: {
+      padding: "5px 8px",
+      borderRadius: 8,
+      border: `2px solid ${form.bleedCount === n ? typeInfo.color : "#d4c5b0"}`,
+      background: form.bleedCount === n ? typeInfo.color : "transparent",
+      color: form.bleedCount === n ? "white" : "#7a5c44",
+      fontWeight: 600,
+      fontSize: 12,
+      cursor: "pointer"
+    }
+  }, typeInfo.key === "regular" ? n : `${n}י`))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#f0f8e8",
+      borderRadius: 12,
+      padding: "13px",
+      marginBottom: 14,
+      border: "1px solid #B8D8B0"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: form.hefsekDate ? 10 : 0
+    }
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 6,
+      fontSize: 13,
+      color: "var(--green)",
+      fontWeight: 700
+    }
+  }, /*#__PURE__*/React.createElement(AppIcon, {
+    name: "drop-line",
+    color: "var(--green)",
+    size: 15
+  }), "\u05D4\u05E4\u05E1\u05E7 \u05D8\u05D4\u05E8\u05D4"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "var(--text-light)",
+      marginTop: 2
+    }
+  }, form.hefsekDate ? formatDate(form.hefsekDate) : `אוטומטי: ${formatDate(addDays(form.bleedStart, form.bleedCount - 1))} (יום סיום הדימום)`)), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setForm(f => ({
+      ...f,
+      hefsekDate: f.hefsekDate ? "" : addDays(f.bleedStart, f.bleedCount - 1),
+      manualStart: ""
+    })),
+    style: {
+      padding: "5px 10px",
+      borderRadius: 16,
+      border: `1px solid ${form.hefsekDate ? "#e07070" : "#5A9B72"}`,
+      background: form.hefsekDate ? "#ffeaea" : "#DDF0DA",
+      color: form.hefsekDate ? "#c04040" : "var(--green)",
+      fontSize: 12,
+      fontWeight: 600,
+      cursor: "pointer"
+    }
+  }, form.hefsekDate ? "בטל" : "שנה")), form.hefsekDate && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("input", {
+    type: "date",
+    value: form.hefsekDate,
+    min: addDays(form.bleedStart, form.bleedCount - 1),
+    onChange: e => setForm(f => ({
+      ...f,
+      hefsekDate: e.target.value,
+      manualStart: ""
+    })),
+    style: {
+      width: "100%",
+      padding: "8px 12px",
+      borderRadius: 9,
+      border: "2px solid var(--green-mid)",
+      background: "white",
+      fontSize: 14,
+      outline: "none",
+      direction: "ltr",
+      marginBottom: 6
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "var(--text-light)",
+      background: "white",
+      borderRadius: 7,
+      padding: "6px 9px",
+      border: "1px solid #B8D8B044"
+    }
+  }, "\uD83D\uDCA1 \u05D4\u05E4\u05E1\u05E7 \u05D8\u05D4\u05E8\u05D4 \u05E0\u05E2\u05E9\u05D4 \u05D1\u05E1\u05D5\u05E3 \u05D4\u05E2\u05D5\u05E0\u05D4 \u05D1\u05D9\u05D5\u05DD \u05E1\u05D9\u05D5\u05DD \u05D4\u05D3\u05D9\u05DE\u05D5\u05DD, \u05D0\u05D5 \u05D1\u05D9\u05D5\u05DD \u05DE\u05D0\u05D5\u05D7\u05E8 \u05D9\u05D5\u05EA\u05E8 \u05D0\u05DD \u05E0\u05D3\u05E8\u05E9\u05D4 \u05D4\u05DE\u05EA\u05E0\u05D4 \u05E0\u05D5\u05E1\u05E4\u05EA"))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#f5f0fb",
+      borderRadius: 12,
+      padding: "11px 13px",
+      marginBottom: 14,
+      border: "1px solid #d8c8f0"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center"
+    }
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 5,
+      fontSize: 13,
+      color: "var(--purple)",
+      fontWeight: 600
+    }
+  }, /*#__PURE__*/React.createElement(AppIcon, {
+    name: "leaf",
+    color: "var(--purple)",
+    size: 14
+  }), "\u05EA\u05D7\u05D9\u05DC\u05EA \u05E1\u05E4\u05D9\u05E8\u05EA \u05E9\u05D1\u05E2\u05D4 \u05E0\u05E7\u05D9\u05D9\u05DD"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "#8070a0",
+      marginTop: 1
+    }
+  }, form.manualStart ? `ידני: ${formatDate(form.manualStart)}` : `אוטומטי: ${formatDate(countStart)}`)), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setForm(f => ({
+      ...f,
+      manualStart: f.manualStart ? "" : countStart
+    })),
+    style: {
+      padding: "5px 10px",
+      borderRadius: 16,
+      border: `1px solid ${form.manualStart ? "#e07070" : "#9070c0"}`,
+      background: form.manualStart ? "#ffeaea" : "#ede8f8",
+      color: form.manualStart ? "#c04040" : "#6040a0",
+      fontSize: 12,
+      fontWeight: 600,
+      cursor: "pointer"
+    }
+  }, form.manualStart ? "בטל" : "שנה")), form.manualStart && /*#__PURE__*/React.createElement("input", {
+    type: "date",
+    value: form.manualStart,
+    min: form.hefsekDate || autoStart,
+    onChange: e => setForm(f => ({
+      ...f,
+      manualStart: e.target.value
+    })),
+    style: {
+      width: "100%",
+      padding: "8px 12px",
+      borderRadius: 8,
+      border: "2px solid #9070c0",
+      background: "white",
+      fontSize: 14,
+      outline: "none",
+      direction: "ltr",
+      marginTop: 10
+    }
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: {
+      display: "block",
+      fontSize: 13,
+      color: "var(--text-mid)",
+      fontWeight: 600,
+      marginBottom: 8
+    }
+  }, "\u05E2\u05D5\u05E0\u05D4 \u05E9\u05D1\u05D4 \u05D4\u05D5\u05E4\u05D9\u05E2 \u05D4\u05D3\u05D9\u05DE\u05D5\u05DD:"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "grid",
+      gridTemplateColumns: "1fr 1fr",
+      gap: 8
+    }
+  }, [["day", "sun", "עונת יום", "מהנץ ועד השקיעה"], ["night", "moon", "עונת לילה", "משקיעה ועד הנץ"]].map(([key, ic, label, sub]) => /*#__PURE__*/React.createElement("button", {
+    key: key,
+    onClick: () => setForm(f => ({
+      ...f,
+      onahStart: key
+    })),
+    style: {
+      padding: "10px",
+      borderRadius: 12,
+      cursor: "pointer",
+      textAlign: "center",
+      border: `2px solid ${form.onahStart === key ? "var(--primary-mid)" : "var(--border)"}`,
+      background: form.onahStart === key ? key === "day" ? "linear-gradient(135deg,#FDF6E3,#FAE8B0)" : "linear-gradient(135deg,#0D0B20,#1A1540)" : "var(--bg)",
+      transition: "all 0.2s"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "center",
+      marginBottom: 5
+    }
+  }, /*#__PURE__*/React.createElement(AppIcon, {
+    name: key,
+    color: form.onahStart === key ? key === "day" ? "var(--gold)" : "#A0B4FF" : "var(--text-light)",
+    size: 24
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 700,
+      fontSize: 13,
+      color: form.onahStart === key ? key === "day" ? "var(--gold)" : "#A0B4FF" : "var(--text-mid)"
+    }
+  }, label), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      color: form.onahStart === key ? key === "day" ? "var(--text-mid)" : "rgba(160,180,255,0.7)" : "var(--text-light)",
+      marginTop: 2
+    }
+  }, sub)))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "var(--text-light)",
+      marginTop: 6,
+      background: "var(--gold-bg)",
+      borderRadius: 8,
+      padding: "6px 10px",
+      border: "1px solid #D4AE5A44"
+    }
+  }, "\u05DE\u05D9\u05D3\u05E2 \u05D6\u05D4 \u05D9\u05E9\u05DE\u05E9 \u05DC\u05D7\u05D9\u05E9\u05D5\u05D1 \u05D4\u05D5\u05E1\u05EA\u05D5\u05EA \u05D1\u05D7\u05D5\u05D3\u05E9\u05D9\u05DD \u05D4\u05D1\u05D0\u05D9\u05DD")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#fdf3e8",
+      borderRadius: 11,
+      padding: "11px 13px",
+      marginBottom: 14,
+      border: "1px solid #e8d0b0"
+    }
+  }, [["drop", "סיום דימום", formatDate(addDays(form.bleedStart, form.bleedCount - 1)), "var(--red-mid)"], ["drop-line", "הפסק טהרה", formatDate(hefsekDate), "var(--green)"], ["leaf", "תחילת ספירה", formatDate(countStart), "var(--purple)"], ["wave", "טבילה", formatDate(mikvehDate), "var(--green)"]].map(([ic, lbl, val, col]) => /*#__PURE__*/React.createElement("div", {
+    key: lbl,
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      marginBottom: 4
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 5,
+      fontSize: 12,
+      color: "var(--text-mid)"
+    }
+  }, /*#__PURE__*/React.createElement(AppIcon, {
+    name: ic,
+    color: col,
+    size: 13
+  }), lbl, ":"), /*#__PURE__*/React.createElement("strong", {
+    style: {
+      fontSize: 12,
+      color: col
+    }
+  }, val)))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 10
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: onCreate,
+    style: {
+      flex: 1,
+      padding: "12px",
+      background: "linear-gradient(135deg,#7eb89a,#5a9878)",
+      color: "white",
+      border: "none",
+      borderRadius: 12,
+      fontWeight: 700,
+      fontSize: 15,
+      cursor: "pointer"
+    }
+  }, "\u2713 \u05E6\u05D5\u05E8 \u05DE\u05D7\u05D6\u05D5\u05E8"), /*#__PURE__*/React.createElement("button", {
+    onClick: onCancel,
+    style: {
+      padding: "12px 16px",
+      background: "#f0e4d4",
+      color: "#8a6040",
+      border: "none",
+      borderRadius: 12,
+      fontSize: 14,
+      cursor: "pointer"
+    }
+  }, "\u05D1\u05D9\u05D8\u05D5\u05DC")));
+}
+
+// ─── LEGEND DOT SVG ──────────────────────────
+function LegendDot({
+  color,
+  icon,
+  size = 12
+}) {
+  const p = {
+    fill: "none",
+    stroke: color,
+    strokeWidth: 1.6,
+    strokeLinecap: "round"
+  };
+  if (icon === "bleed") return /*#__PURE__*/React.createElement("svg", _extends({
+    width: size,
+    height: size,
+    viewBox: "0 0 12 12"
+  }, p), /*#__PURE__*/React.createElement("path", {
+    d: "M6 1 C6 1 2 5 2 7.5 a4 4 0 0 0 8 0 C10 5 6 1 6 1z"
+  }));
+  if (icon === "hefsek") return /*#__PURE__*/React.createElement("svg", _extends({
+    width: size,
+    height: size,
+    viewBox: "0 0 12 12"
+  }, p), /*#__PURE__*/React.createElement("path", {
+    d: "M6 1 C6 1 2 5 2 7.5 a4 4 0 0 0 8 0 C10 5 6 1 6 1z"
+  }), /*#__PURE__*/React.createElement("line", {
+    x1: "4",
+    y1: "7",
+    x2: "8",
+    y2: "7",
+    strokeWidth: 2
+  }));
+  if (icon === "sefirah") return /*#__PURE__*/React.createElement("svg", _extends({
+    width: size,
+    height: size,
+    viewBox: "0 0 12 12"
+  }, p), [0, 1, 2, 3, 4, 5, 6].map(i => /*#__PURE__*/React.createElement("circle", {
+    key: i,
+    cx: 1.5 + i * 1.4,
+    cy: "6",
+    r: "0.7",
+    fill: color,
+    stroke: "none"
+  })));
+  if (icon === "mikveh") return /*#__PURE__*/React.createElement("svg", _extends({
+    width: size,
+    height: size,
+    viewBox: "0 0 12 12"
+  }, p), /*#__PURE__*/React.createElement("path", {
+    d: "M1 8 C3 5 9 5 11 8",
+    strokeWidth: 1.8
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M2 10 C4 7 8 7 10 10"
+  }));
+  if (icon === "pregnant") return /*#__PURE__*/React.createElement("svg", _extends({
+    width: size,
+    height: size,
+    viewBox: "0 0 12 12"
+  }, p), /*#__PURE__*/React.createElement("circle", {
+    cx: "6",
+    cy: "4",
+    r: "2"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M4 6.5 C4 6.5 3 8 4 10 C5 11 7 11 8 10 C9 8 8 6.5 8 6.5",
+    fill: color,
+    fillOpacity: "0.2"
+  }));
+  if (icon === "loss") return /*#__PURE__*/React.createElement("svg", _extends({
+    width: size,
+    height: size,
+    viewBox: "0 0 12 12"
+  }, p), /*#__PURE__*/React.createElement("line", {
+    x1: "3",
+    y1: "3",
+    x2: "9",
+    y2: "9",
+    strokeWidth: 2
+  }), /*#__PURE__*/React.createElement("line", {
+    x1: "9",
+    y1: "3",
+    x2: "3",
+    y2: "9",
+    strokeWidth: 2
+  }));
+  if (icon === "birth") return /*#__PURE__*/React.createElement("svg", _extends({
+    width: size,
+    height: size,
+    viewBox: "0 0 12 12"
+  }, p), /*#__PURE__*/React.createElement("circle", {
+    cx: "6",
+    cy: "4",
+    r: "2"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M3 11 C3 8 9 8 9 11"
+  }), /*#__PURE__*/React.createElement("circle", {
+    cx: "9.5",
+    cy: "2.5",
+    r: "1",
+    fill: color,
+    stroke: "none"
+  }));
+  if (icon === "veset") return /*#__PURE__*/React.createElement("svg", _extends({
+    width: size,
+    height: size,
+    viewBox: "0 0 12 12"
+  }, p), /*#__PURE__*/React.createElement("path", {
+    d: "M6 1 a5 5 0 1 1 0 10",
+    strokeDasharray: "3 2"
+  }), /*#__PURE__*/React.createElement("circle", {
+    cx: "6",
+    cy: "1",
+    r: "1",
+    fill: color,
+    stroke: "none"
+  }));
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: size,
+      height: size,
+      borderRadius: "50%",
+      background: color
+    }
+  });
+}
+
+// ─── APP ICON SYSTEM ──────────────────────────
+// Unified SVG icon library matching the app's visual language
+function AppIcon({
+  name,
+  color = "currentColor",
+  size = 18,
+  strokeWidth = 1.8
+}) {
+  const p = {
+    fill: "none",
+    stroke: color,
+    strokeWidth,
+    strokeLinecap: "round",
+    strokeLinejoin: "round"
+  };
+
+  // ── Cycle / Purity icons ──────────────────
+  if (name === "drop") return (
+    /*#__PURE__*/
+    // Blood / dew drop
+    React.createElement("svg", _extends({
+      width: size,
+      height: size,
+      viewBox: "0 0 24 24"
+    }, p), /*#__PURE__*/React.createElement("path", {
+      d: "M12 3 C12 3 4 11 4 16 a8 8 0 0 0 16 0 C20 11 12 3 12 3z"
+    }))
+  );
+  if (name === "drop-line") return (
+    /*#__PURE__*/
+    // Hefsek tahara — drop with horizontal line
+    React.createElement("svg", _extends({
+      width: size,
+      height: size,
+      viewBox: "0 0 24 24"
+    }, p), /*#__PURE__*/React.createElement("path", {
+      d: "M12 3 C12 3 4 11 4 16 a8 8 0 0 0 16 0 C20 11 12 3 12 3z"
+    }), /*#__PURE__*/React.createElement("line", {
+      x1: "8",
+      y1: "16",
+      x2: "16",
+      y2: "16",
+      strokeWidth: strokeWidth * 1.2
+    }))
+  );
+  if (name === "wave") return (
+    /*#__PURE__*/
+    // Mikveh / water
+    React.createElement("svg", _extends({
+      width: size,
+      height: size,
+      viewBox: "0 0 24 24"
+    }, p), /*#__PURE__*/React.createElement("path", {
+      d: "M2 10 C5 7 9 7 12 10 C15 13 19 13 22 10"
+    }), /*#__PURE__*/React.createElement("path", {
+      d: "M2 16 C5 13 9 13 12 16 C15 19 19 19 22 16"
+    }))
+  );
+  if (name === "leaf") return (
+    /*#__PURE__*/
+    // Purity / counting start
+    React.createElement("svg", _extends({
+      width: size,
+      height: size,
+      viewBox: "0 0 24 24"
+    }, p), /*#__PURE__*/React.createElement("path", {
+      d: "M6 20 C6 20 8 8 20 4 C16 16 6 20 6 20z"
+    }), /*#__PURE__*/React.createElement("path", {
+      d: "M6 20 C9 15 13 11 20 4",
+      strokeDasharray: "2 2",
+      opacity: "0.6"
+    }))
+  );
+  if (name === "moon") return (
+    /*#__PURE__*/
+    // Night / lunar
+    React.createElement("svg", _extends({
+      width: size,
+      height: size,
+      viewBox: "0 0 24 24"
+    }, p), /*#__PURE__*/React.createElement("path", {
+      d: "M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z",
+      fill: color,
+      fillOpacity: "0.12"
+    }), /*#__PURE__*/React.createElement("path", {
+      d: "M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"
+    }))
+  );
+  if (name === "sun") return (
+    /*#__PURE__*/
+    // Day / morning
+    React.createElement("svg", _extends({
+      width: size,
+      height: size,
+      viewBox: "0 0 24 24"
+    }, p), /*#__PURE__*/React.createElement("circle", {
+      cx: "12",
+      cy: "12",
+      r: "4"
+    }), [0, 45, 90, 135, 180, 225, 270, 315].map((deg, i) => {
+      const r = Math.PI * deg / 180,
+        x1 = 12 + 7 * Math.cos(r),
+        y1 = 12 + 7 * Math.sin(r),
+        x2 = 12 + 9.5 * Math.cos(r),
+        y2 = 12 + 9.5 * Math.sin(r);
+      return /*#__PURE__*/React.createElement("line", {
+        key: i,
+        x1: x1,
+        y1: y1,
+        x2: x2,
+        y2: y2,
+        strokeWidth: strokeWidth * 0.9
+      });
+    }))
+  );
+  if (name === "sunrise") return (
+    /*#__PURE__*/
+    // Morning check
+    React.createElement("svg", _extends({
+      width: size,
+      height: size,
+      viewBox: "0 0 24 24"
+    }, p), /*#__PURE__*/React.createElement("circle", {
+      cx: "12",
+      cy: "13",
+      r: "4"
+    }), /*#__PURE__*/React.createElement("line", {
+      x1: "12",
+      y1: "4",
+      x2: "12",
+      y2: "6"
+    }), /*#__PURE__*/React.createElement("line", {
+      x1: "4.5",
+      y1: "6.5",
+      x2: "6",
+      y2: "8"
+    }), /*#__PURE__*/React.createElement("line", {
+      x1: "19.5",
+      y1: "6.5",
+      x2: "18",
+      y2: "8"
+    }), /*#__PURE__*/React.createElement("line", {
+      x1: "2",
+      y1: "13",
+      x2: "4.5",
+      y2: "13"
+    }), /*#__PURE__*/React.createElement("line", {
+      x1: "21.5",
+      y1: "13",
+      x2: "19",
+      y2: "13"
+    }), /*#__PURE__*/React.createElement("line", {
+      x1: "3",
+      y1: "20",
+      x2: "21",
+      y2: "20"
+    }))
+  );
+  if (name === "sunset") return (
+    /*#__PURE__*/
+    // Evening check
+    React.createElement("svg", _extends({
+      width: size,
+      height: size,
+      viewBox: "0 0 24 24"
+    }, p), /*#__PURE__*/React.createElement("path", {
+      d: "M12 9 C15.3 9 18 11.7 18 15 L6 15 C6 11.7 8.7 9 12 9z"
+    }), /*#__PURE__*/React.createElement("line", {
+      x1: "12",
+      y1: "3",
+      x2: "12",
+      y2: "6",
+      opacity: "0.5"
+    }), /*#__PURE__*/React.createElement("line", {
+      x1: "4",
+      y1: "6",
+      x2: "5.5",
+      y2: "7.5",
+      opacity: "0.5"
+    }), /*#__PURE__*/React.createElement("line", {
+      x1: "20",
+      y1: "6",
+      x2: "18.5",
+      y2: "7.5",
+      opacity: "0.5"
+    }), /*#__PURE__*/React.createElement("line", {
+      x1: "3",
+      y1: "20",
+      x2: "21",
+      y2: "20"
+    }))
+  );
+  if (name === "flower") return (
+    /*#__PURE__*/
+    // Joy / completion
+    React.createElement("svg", _extends({
+      width: size,
+      height: size,
+      viewBox: "0 0 24 24"
+    }, p), [0, 60, 120, 180, 240, 300].map((deg, i) => {
+      const r = Math.PI * deg / 180,
+        cx = 12 + 4.5 * Math.cos(r),
+        cy = 12 + 4.5 * Math.sin(r);
+      return /*#__PURE__*/React.createElement("ellipse", {
+        key: i,
+        cx: cx,
+        cy: cy,
+        rx: "3",
+        ry: "1.8",
+        transform: `rotate(${deg} ${cx} ${cy})`,
+        fill: color,
+        fillOpacity: "0.15"
+      });
+    }), [0, 60, 120, 180, 240, 300].map((deg, i) => {
+      const r = Math.PI * deg / 180,
+        cx = 12 + 4.5 * Math.cos(r),
+        cy = 12 + 4.5 * Math.sin(r);
+      return /*#__PURE__*/React.createElement("ellipse", {
+        key: i,
+        cx: cx,
+        cy: cy,
+        rx: "3",
+        ry: "1.8",
+        transform: `rotate(${deg} ${cx} ${cy})`
+      });
+    }), /*#__PURE__*/React.createElement("circle", {
+      cx: "12",
+      cy: "12",
+      r: "2.5",
+      fill: color,
+      fillOpacity: "0.4"
+    }))
+  );
+
+  // ── Life events ───────────────────────────
+  if (name === "pregnant") return /*#__PURE__*/React.createElement("svg", _extends({
+    width: size,
+    height: size,
+    viewBox: "0 0 24 24"
+  }, p), /*#__PURE__*/React.createElement("circle", {
+    cx: "12",
+    cy: "5",
+    r: "3"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M9 9 C7 10 6 12 6 15 C6 18 8 20 10 21 L14 21 C16 20 18 18 18 15 C18 12 17 10 15 9z",
+    fill: color,
+    fillOpacity: "0.1"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M9 9 C7 10 6 12 6 15 C6 18 8 20 10 21 L14 21 C16 20 18 18 18 15 C18 12 17 10 15 9"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M16 14 C16 11.5 14.5 9.5 12 9.2",
+    opacity: "0.5"
+  }));
+  if (name === "loss") return /*#__PURE__*/React.createElement("svg", _extends({
+    width: size,
+    height: size,
+    viewBox: "0 0 24 24"
+  }, p), /*#__PURE__*/React.createElement("path", {
+    d: "M12 21 C12 21 3 15 3 9 a5 5 0 0 1 9-3 5 5 0 0 1 9 3 C21 15 12 21 12 21z",
+    fill: color,
+    fillOpacity: "0.08"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M12 21 C12 21 3 15 3 9 a5 5 0 0 1 9-3 5 5 0 0 1 9 3 C21 15 12 21 12 21z"
+  }), /*#__PURE__*/React.createElement("line", {
+    x1: "9",
+    y1: "11",
+    x2: "15",
+    y2: "17",
+    strokeWidth: strokeWidth * 1.2
+  }), /*#__PURE__*/React.createElement("line", {
+    x1: "15",
+    y1: "11",
+    x2: "9",
+    y2: "17",
+    strokeWidth: strokeWidth * 1.2
+  }));
+  if (name === "birth" || name === "birth-boy" || name === "birth-girl") return /*#__PURE__*/React.createElement("svg", _extends({
+    width: size,
+    height: size,
+    viewBox: "0 0 24 24"
+  }, p), /*#__PURE__*/React.createElement("circle", {
+    cx: "12",
+    cy: "9",
+    r: "4"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M6 21 C6 17.7 8.7 15 12 15 C15.3 15 18 17.7 18 21"
+  }), /*#__PURE__*/React.createElement("circle", {
+    cx: "18",
+    cy: "5",
+    r: "2",
+    fill: color,
+    fillOpacity: "0.4"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M18 2 L18 3 M21 5 L20 5 M19.4 2.6 L18.7 3.3",
+    strokeWidth: strokeWidth * 0.9
+  }));
+
+  // ── UI icons ──────────────────────────────
+  if (name === "bell") return /*#__PURE__*/React.createElement("svg", _extends({
+    width: size,
+    height: size,
+    viewBox: "0 0 24 24"
+  }, p), /*#__PURE__*/React.createElement("path", {
+    d: "M6 10 C6 6.7 8.7 4 12 4 C15.3 4 18 6.7 18 10 L18 16 L6 16z",
+    fill: color,
+    fillOpacity: "0.1"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M6 10 C6 6.7 8.7 4 12 4 C15.3 4 18 6.7 18 10 L18 16 L6 16z"
+  }), /*#__PURE__*/React.createElement("line", {
+    x1: "4",
+    y1: "16",
+    x2: "20",
+    y2: "16"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M10 16 a2 2 0 0 0 4 0"
+  }), /*#__PURE__*/React.createElement("line", {
+    x1: "12",
+    y1: "2",
+    x2: "12",
+    y2: "4"
+  }));
+  if (name === "lock") return /*#__PURE__*/React.createElement("svg", _extends({
+    width: size,
+    height: size,
+    viewBox: "0 0 24 24"
+  }, p), /*#__PURE__*/React.createElement("rect", {
+    x: "5",
+    y: "11",
+    width: "14",
+    height: "10",
+    rx: "2",
+    fill: color,
+    fillOpacity: "0.08"
+  }), /*#__PURE__*/React.createElement("rect", {
+    x: "5",
+    y: "11",
+    width: "14",
+    height: "10",
+    rx: "2"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M8 11 L8 7 a4 4 0 0 1 8 0 L16 11"
+  }), /*#__PURE__*/React.createElement("circle", {
+    cx: "12",
+    cy: "16",
+    r: "1.5",
+    fill: color,
+    stroke: "none"
+  }), /*#__PURE__*/React.createElement("line", {
+    x1: "12",
+    y1: "17.5",
+    x2: "12",
+    y2: "19",
+    strokeWidth: strokeWidth * 0.9
+  }));
+  if (name === "save") return /*#__PURE__*/React.createElement("svg", _extends({
+    width: size,
+    height: size,
+    viewBox: "0 0 24 24"
+  }, p), /*#__PURE__*/React.createElement("path", {
+    d: "M12 3 L12 15 M7 10 L12 15 L17 10"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M5 18 L5 20 L19 20 L19 18"
+  }));
+  if (name === "export") return /*#__PURE__*/React.createElement("svg", _extends({
+    width: size,
+    height: size,
+    viewBox: "0 0 24 24"
+  }, p), /*#__PURE__*/React.createElement("path", {
+    d: "M12 3 L12 15 M7 8 L12 3 L17 8"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M5 17 L5 21 L19 21 L19 17"
+  }));
+  if (name === "import") return /*#__PURE__*/React.createElement("svg", _extends({
+    width: size,
+    height: size,
+    viewBox: "0 0 24 24"
+  }, p), /*#__PURE__*/React.createElement("path", {
+    d: "M12 3 L12 15 M7 10 L12 15 L17 10"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M5 17 L5 21 L19 21 L19 17"
+  }), /*#__PURE__*/React.createElement("line", {
+    x1: "5",
+    y1: "17",
+    x2: "19",
+    y2: "17"
+  }));
+  if (name === "trash") return /*#__PURE__*/React.createElement("svg", _extends({
+    width: size,
+    height: size,
+    viewBox: "0 0 24 24"
+  }, p), /*#__PURE__*/React.createElement("line", {
+    x1: "3",
+    y1: "6",
+    x2: "21",
+    y2: "6"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M8 6 L8 4 L16 4 L16 6"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M5 6 L6 21 L18 21 L19 6",
+    fill: color,
+    fillOpacity: "0.06"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M5 6 L6 21 L18 21 L19 6"
+  }), /*#__PURE__*/React.createElement("line", {
+    x1: "10",
+    y1: "10",
+    x2: "10",
+    y2: "17",
+    strokeWidth: strokeWidth * 0.9
+  }), /*#__PURE__*/React.createElement("line", {
+    x1: "14",
+    y1: "10",
+    x2: "14",
+    y2: "17",
+    strokeWidth: strokeWidth * 0.9
+  }));
+  if (name === "info") return /*#__PURE__*/React.createElement("svg", _extends({
+    width: size,
+    height: size,
+    viewBox: "0 0 24 24"
+  }, p), /*#__PURE__*/React.createElement("circle", {
+    cx: "12",
+    cy: "12",
+    r: "9",
+    fill: color,
+    fillOpacity: "0.08"
+  }), /*#__PURE__*/React.createElement("circle", {
+    cx: "12",
+    cy: "12",
+    r: "9"
+  }), /*#__PURE__*/React.createElement("line", {
+    x1: "12",
+    y1: "11",
+    x2: "12",
+    y2: "17"
+  }), /*#__PURE__*/React.createElement("circle", {
+    cx: "12",
+    cy: "8",
+    r: "0.8",
+    fill: color,
+    stroke: "none"
+  }));
+  if (name === "check-circle") return /*#__PURE__*/React.createElement("svg", _extends({
+    width: size,
+    height: size,
+    viewBox: "0 0 24 24"
+  }, p), /*#__PURE__*/React.createElement("circle", {
+    cx: "12",
+    cy: "12",
+    r: "9",
+    fill: color,
+    fillOpacity: "0.12"
+  }), /*#__PURE__*/React.createElement("circle", {
+    cx: "12",
+    cy: "12",
+    r: "9"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M7.5 12 L10.5 15 L16.5 9",
+    strokeWidth: strokeWidth * 1.1
+  }));
+  if (name === "alert") return /*#__PURE__*/React.createElement("svg", _extends({
+    width: size,
+    height: size,
+    viewBox: "0 0 24 24"
+  }, p), /*#__PURE__*/React.createElement("path", {
+    d: "M12 3 L22 21 L2 21z",
+    fill: color,
+    fillOpacity: "0.08"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M12 3 L22 21 L2 21z"
+  }), /*#__PURE__*/React.createElement("line", {
+    x1: "12",
+    y1: "10",
+    x2: "12",
+    y2: "15"
+  }), /*#__PURE__*/React.createElement("circle", {
+    cx: "12",
+    cy: "18",
+    r: "0.7",
+    fill: color,
+    stroke: "none"
+  }));
+  if (name === "city") return /*#__PURE__*/React.createElement("svg", _extends({
+    width: size,
+    height: size,
+    viewBox: "0 0 24 24"
+  }, p), /*#__PURE__*/React.createElement("circle", {
+    cx: "12",
+    cy: "10",
+    r: "4"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M12 20 C12 20 5 14 5 10 a7 7 0 0 1 14 0 C19 14 12 20 12 20z"
+  }), /*#__PURE__*/React.createElement("circle", {
+    cx: "12",
+    cy: "10",
+    r: "1.5",
+    fill: color,
+    stroke: "none"
+  }));
+  if (name === "clock") return /*#__PURE__*/React.createElement("svg", _extends({
+    width: size,
+    height: size,
+    viewBox: "0 0 24 24"
+  }, p), /*#__PURE__*/React.createElement("circle", {
+    cx: "12",
+    cy: "12",
+    r: "9"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M12 7 L12 12 L15 15",
+    strokeWidth: strokeWidth * 1.1
+  }));
+  if (name === "cycle") return /*#__PURE__*/React.createElement("svg", _extends({
+    width: size,
+    height: size,
+    viewBox: "0 0 24 24"
+  }, p), /*#__PURE__*/React.createElement("path", {
+    d: "M12 4 a8 8 0 1 1 0 16 a8 8 0 0 1 0-16",
+    strokeDasharray: "40 8"
+  }), /*#__PURE__*/React.createElement("polyline", {
+    points: "15,3 12,4 13.5,7",
+    strokeWidth: strokeWidth * 0.9
+  }));
+  return null;
+}
+
+// ─── CALENDAR VIEW ───────────────────────────
+const EVENT_TYPES = {
+  pregnancy: {
+    icon: "pregnant",
+    label: "הריון",
+    color: "#d090e0",
+    bg: "#faf0ff",
+    border: "#c070d0",
+    range: true
+  },
+  miscarriage: {
+    icon: "loss",
+    label: "הפסקת הריון",
+    color: "#a04040",
+    bg: "#fff5f5",
+    border: "#e07070",
+    range: false
+  },
+  birth: {
+    icon: "birth",
+    label: "לידה",
+    color: "#4060c0",
+    bg: "#eef0ff",
+    border: "#6080d0",
+    range: false
+  }
+};
+function CalendarView({
+  cycles,
+  specialEvents,
+  addSpecialEvent,
+  deleteSpecialEvent,
+  calMonth,
+  setCalMonth,
+  activeCycle,
+  todayStr,
+  setView,
+  setShowNewCycle,
+  vesetWarnings
+}) {
+  var _EVENT_TYPES$addEvTyp, _EVENT_TYPES$addEvTyp2;
+  const {
+    y,
+    m
+  } = calMonth;
+  const daysInMonth = getDaysInMonth(y, m);
+  const firstDay = getFirstDayOfMonth(y, m);
+  const [selectedDate, setSelectedDate] = useState(null);
+  const [addEvType, setAddEvType] = useState("");
+  const [evEndDate, setEvEndDate] = useState("");
+
+  // Build cycle date map
+  const dateMap = {};
+  cycles.forEach(cycle => Object.assign(dateMap, getCycleDates(cycle)));
+  const vesetMap = {};
+  vesetWarnings.forEach(w => {
+    vesetMap[w.date] = vesetMap[w.date] || [];
+    vesetMap[w.date].push(w);
+  });
+
+  // Build special event date map (ranges fill all dates)
+  const specialMap = {};
+  specialEvents.forEach(ev => {
+    if (ev.endDate && ev.endDate > ev.date) {
+      let d = ev.date;
+      while (d <= ev.endDate) {
+        specialMap[d] = specialMap[d] || [];
+        specialMap[d].push({
+          ...ev,
+          isRange: true,
+          isStart: d === ev.date,
+          isEnd: d === ev.endDate
+        });
+        d = addDays(d, 1);
+      }
+    } else {
+      specialMap[ev.date] = specialMap[ev.date] || [];
+      specialMap[ev.date].push(ev);
+    }
+  });
+  const cells = Array(firstDay).fill(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+  function ds(d) {
+    return `${y}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+  }
+  const hebMap = getHebForMonth(y, m);
+  function handleDayClick(dateStr) {
+    setSelectedDate(dateStr);
+    setAddEvType("");
+    setEvEndDate("");
+  }
+  function saveEvent() {
+    if (!addEvType) return;
+    const t = EVENT_TYPES[addEvType];
+    addSpecialEvent({
+      id: Date.now(),
+      type: addEvType,
+      date: selectedDate,
+      endDate: t.range && evEndDate && evEndDate > selectedDate ? evEndDate : null
+    });
+    setSelectedDate(null);
+    setAddEvType("");
+  }
+  const selectedDateMarks = selectedDate ? dateMap[selectedDate] || null : null;
+  const selectedSpecials = selectedDate ? specialMap[selectedDate] || [] : [];
+  const selectedVeset = selectedDate ? vesetMap[selectedDate] || [] : [];
+  const CYCLE_MARK_META = {
+    bleed: {
+      icon: "drop",
+      label: "יום דימום",
+      color: "#c04040",
+      bg: "#ffeaea"
+    },
+    hefsek: {
+      icon: "drop-line",
+      label: "הפסק טהרה",
+      color: "#507040",
+      bg: "#f0f8e8"
+    },
+    clean: {
+      icon: "leaf",
+      label: "ספירת שבעה נקיים",
+      color: "#6a9060",
+      bg: "#e8f5ee"
+    },
+    mikveh: {
+      icon: "wave",
+      label: "טבילה במקווה",
+      color: "#3050a0",
+      bg: "#e8eeff"
+    }
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "14px"
+    },
+    className: "fade-in"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "card",
+    style: {
+      padding: "14px",
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => setCalMonth(({
+      y,
+      m
+    }) => m === 0 ? {
+      y: y - 1,
+      m: 11
+    } : {
+      y,
+      m: m - 1
+    }),
+    style: {
+      width: 34,
+      height: 34,
+      borderRadius: "50%",
+      border: "1.5px solid var(--border)",
+      background: "var(--bg)",
+      fontSize: 18,
+      cursor: "pointer",
+      color: "var(--text-mid)",
+      boxShadow: "0 1px 4px var(--shadow)"
+    }
+  }, "\u2039"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      textAlign: "center"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: "'Secular One',sans-serif",
+      fontSize: 17,
+      fontWeight: 700,
+      color: "var(--primary)",
+      letterSpacing: 0.5,
+      lineHeight: 1.2
+    }
+  }, HE_MONTHS[m], " ", y), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "var(--gold)",
+      fontWeight: 500,
+      marginTop: 2,
+      letterSpacing: 0.3
+    }
+  }, getHebMonthsForGregMonth(y, m))), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setCalMonth(({
+      y,
+      m
+    }) => m === 11 ? {
+      y: y + 1,
+      m: 0
+    } : {
+      y,
+      m: m + 1
+    }),
+    style: {
+      width: 34,
+      height: 34,
+      borderRadius: "50%",
+      border: "1.5px solid var(--border)",
+      background: "var(--bg)",
+      fontSize: 18,
+      cursor: "pointer",
+      color: "var(--text-mid)",
+      boxShadow: "0 1px 4px var(--shadow)"
+    }
+  }, "\u203A")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "grid",
+      gridTemplateColumns: "repeat(7,1fr)",
+      gap: 2,
+      marginBottom: 4
+    }
+  }, ["א", "ב", "ג", "ד", "ה", "ו", "ש"].map(wd => /*#__PURE__*/React.createElement("div", {
+    key: wd,
+    style: {
+      textAlign: "center",
+      fontSize: 10,
+      color: "var(--text-light)",
+      fontWeight: 600,
+      padding: "3px 0",
+      letterSpacing: 0.5
+    }
+  }, wd))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "grid",
+      gridTemplateColumns: "repeat(7,1fr)",
+      gap: 2
+    }
+  }, cells.map((d, idx) => {
+    if (!d) return /*#__PURE__*/React.createElement("div", {
+      key: "e" + idx
+    });
+    const dateStr = ds(d);
+    const mark = dateMap[dateStr];
+    const vw = vesetMap[dateStr];
+    const sp = specialMap[dateStr];
+    const isToday = dateStr === todayStr;
+
+    // Determine dominant background
+    let bg = "transparent",
+      textColor = "#4a3728",
+      dots = [];
+
+    // Cycle marks
+    if (mark) {
+      if (mark.type === "bleed") {
+        bg = "#ffeaea";
+        textColor = "#c04040";
+      } else if (mark.type === "hefsek") {
+        bg = "#f0f8e8";
+        textColor = "#507040";
+      } else if (mark.type === "clean") {
+        bg = mark.hasStain ? "#ffeaea" : mark.isClean ? "#e6f7ee" : "#fff8ee";
+        textColor = mark.hasStain ? "#c04040" : mark.isClean ? "#2a7050" : "#8a6020";
+      } else if (mark.type === "mikveh") {
+        bg = "#e8eeff";
+        textColor = "#3050a0";
+      }
+    }
+    if (vw) {
+      bg = "#fff0f0";
+      textColor = "#c04040";
+    }
+
+    // Special event dots
+    if (sp) sp.forEach(ev => {
+      const t = EVENT_TYPES[ev.type];
+      if (t) dots.push(t.color);
+    });
+
+    // Special event background override (if no cycle mark)
+    if (sp && sp.length > 0 && !mark) {
+      const t = EVENT_TYPES[sp[0].type];
+      if (t) {
+        bg = t.bg;
+        textColor = t.color;
+      }
+    }
+
+    // Label inside cell
+    let innerLabel = null;
+    if ((mark === null || mark === void 0 ? void 0 : mark.type) === "bleed") innerLabel = /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 7,
+        display: "block",
+        lineHeight: 1,
+        color: textColor
+      }
+    }, "\u05D3\u05D9\u05DE\u05D5\u05DD");else if ((mark === null || mark === void 0 ? void 0 : mark.type) === "hefsek") innerLabel = /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 7,
+        display: "block",
+        lineHeight: 1,
+        color: textColor
+      }
+    }, "\u05D4\u05E4\u05E1\u05E7");else if ((mark === null || mark === void 0 ? void 0 : mark.type) === "clean") innerLabel = /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 8,
+        display: "block",
+        fontWeight: 700,
+        lineHeight: 1,
+        color: textColor
+      }
+    }, mark.hasStain ? "!" : "ז" + mark.dayNum);else if ((mark === null || mark === void 0 ? void 0 : mark.type) === "mikveh") innerLabel = /*#__PURE__*/React.createElement("span", {
+      style: {
+        display: "flex",
+        justifyContent: "center"
+      }
+    }, /*#__PURE__*/React.createElement(AppIcon, {
+      name: "wave",
+      color: textColor,
+      size: 9
+    }));
+    if (vw && !innerLabel) innerLabel = /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 8,
+        display: "block",
+        color: "#c04040",
+        lineHeight: 1
+      }
+    }, "\u26A0");
+    return /*#__PURE__*/React.createElement("div", {
+      key: idx,
+      onClick: () => handleDayClick(dateStr),
+      style: {
+        borderRadius: 10,
+        padding: "3px 1px 5px",
+        textAlign: "center",
+        background: bg,
+        cursor: "pointer",
+        border: `2px solid ${isToday ? "var(--primary-mid)" : vw ? "rgba(200,60,60,0.3)" : "transparent"}`,
+        minHeight: 52,
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        transition: "all 0.15s",
+        gap: 1,
+        boxShadow: isToday ? "0 0 0 1px var(--primary-mid)" : "none"
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 11,
+        fontWeight: isToday ? 700 : 400,
+        color: textColor,
+        lineHeight: 1.1
+      }
+    }, d), (() => {
+      const hd = hebMap[dateStr];
+      if (!hd) return null;
+      const isRH = hd.day === 1;
+      return /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: isRH ? 7.5 : 8,
+          fontWeight: isRH ? 700 : 400,
+          color: isRH ? textColor : textColor === "var(--text-light)" || textColor === "#4a3728" ? "var(--text-light)" : textColor,
+          lineHeight: 1,
+          opacity: isRH ? 1 : 0.7,
+          letterSpacing: -0.2
+        }
+      }, isRH ? `א׳ ${HEB_MONTHS[hd.month].slice(0, 4)}` : HEB_DAYS[hd.day]);
+    })(), innerLabel, dots.length > 0 && /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 2,
+        justifyContent: "center"
+      }
+    }, dots.slice(0, 3).map((c, i) => /*#__PURE__*/React.createElement("div", {
+      key: i,
+      style: {
+        width: 4,
+        height: 4,
+        borderRadius: "50%",
+        background: c
+      }
+    }))));
+  }))), selectedDate && /*#__PURE__*/React.createElement("div", {
+    className: "card slide-up",
+    style: {
+      padding: "16px",
+      marginBottom: 12,
+      borderTop: "3px solid var(--gold)"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 700,
+      fontSize: 15,
+      color: "#5a3015"
+    }
+  }, formatDate(selectedDate)), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setSelectedDate(null),
+    style: {
+      background: "none",
+      border: "none",
+      cursor: "pointer",
+      padding: 4,
+      display: "flex",
+      alignItems: "center"
+    }
+  }, /*#__PURE__*/React.createElement("svg", {
+    width: "16",
+    height: "16",
+    viewBox: "0 0 16 16",
+    fill: "none",
+    stroke: "var(--text-light)",
+    strokeWidth: "2",
+    strokeLinecap: "round"
+  }, /*#__PURE__*/React.createElement("line", {
+    x1: "3",
+    y1: "3",
+    x2: "13",
+    y2: "13"
+  }), /*#__PURE__*/React.createElement("line", {
+    x1: "13",
+    y1: "3",
+    x2: "3",
+    y2: "13"
+  })))), selectedDateMarks && (() => {
+    const meta = CYCLE_MARK_META[selectedDateMarks.type];
+    if (!meta) return null;
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        background: meta.bg,
+        borderRadius: 10,
+        padding: "8px 12px",
+        marginBottom: 8,
+        border: "1px solid " + meta.color + "44"
+      }
+    }, /*#__PURE__*/React.createElement(AppIcon, {
+      name: meta.icon,
+      color: meta.color,
+      size: 16
+    }), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 13,
+        color: meta.color,
+        fontWeight: 600
+      }
+    }, meta.label, selectedDateMarks.type === "clean" && ` — יום ${selectedDateMarks.dayNum}`, selectedDateMarks.type === "clean" && selectedDateMarks.hasStain && /*#__PURE__*/React.createElement("span", {
+      style: {
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 3,
+        marginRight: 4
+      }
+    }, /*#__PURE__*/React.createElement(AppIcon, {
+      name: "alert",
+      color: "var(--red-mid)",
+      size: 12
+    }), "\u05DB\u05EA\u05DD"), selectedDateMarks.type === "mikveh" && selectedDateMarks.done && /*#__PURE__*/React.createElement(AppIcon, {
+      name: "check-circle",
+      color: "var(--green)",
+      size: 13
+    })));
+  })(), selectedVeset.map((w, i) => /*#__PURE__*/React.createElement("div", {
+    key: i,
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      background: "#fff0f0",
+      borderRadius: 10,
+      padding: "8px 12px",
+      marginBottom: 8,
+      border: "1px solid #e0808066"
+    }
+  }, /*#__PURE__*/React.createElement(AppIcon, {
+    name: "alert",
+    color: "var(--red-mid)",
+    size: 16
+  }), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 13,
+      color: "#c04040",
+      fontWeight: 600
+    }
+  }, w.label))), selectedSpecials.map((ev, i) => {
+    const t = EVENT_TYPES[ev.type];
+    if (!t) return null;
+    return /*#__PURE__*/React.createElement("div", {
+      key: i,
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        background: t.bg,
+        borderRadius: 10,
+        padding: "8px 12px",
+        marginBottom: 8,
+        border: "1px solid " + t.border + "66",
+        justifyContent: "space-between"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 8
+      }
+    }, /*#__PURE__*/React.createElement(AppIcon, {
+      name: t.icon,
+      color: t.color,
+      size: 16
+    }), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 13,
+        color: t.color,
+        fontWeight: 600
+      }
+    }, t.label), ev.endDate && /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 10,
+        color: "#9a7a5a"
+      }
+    }, "\u05E2\u05D3 ", formatDate(ev.endDate)))), /*#__PURE__*/React.createElement("button", {
+      onClick: () => deleteSpecialEvent(ev.id),
+      style: {
+        background: "none",
+        border: "none",
+        cursor: "pointer",
+        padding: 4,
+        display: "flex",
+        alignItems: "center"
+      }
+    }, /*#__PURE__*/React.createElement(AppIcon, {
+      name: "trash",
+      color: "var(--red-mid)",
+      size: 16
+    })));
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      borderTop: "1px solid #f0e4d4",
+      paddingTop: 10,
+      marginTop: 4
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 5,
+      fontSize: 12,
+      color: "var(--text-mid)",
+      fontWeight: 600,
+      marginBottom: 8
+    }
+  }, /*#__PURE__*/React.createElement(AppIcon, {
+    name: "plus",
+    color: "var(--primary-mid)",
+    size: 13
+  }), "\u05D4\u05D5\u05E1\u05E4\u05EA \u05D0\u05D9\u05E8\u05D5\u05E2 \u05DC\u05EA\u05D0\u05E8\u05D9\u05DA \u05D6\u05D4:"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 6,
+      flexWrap: "wrap",
+      marginBottom: 10
+    }
+  }, Object.entries(EVENT_TYPES).map(([key, t]) => /*#__PURE__*/React.createElement("button", {
+    key: key,
+    onClick: () => setAddEvType(addEvType === key ? "" : key),
+    style: {
+      padding: "6px 10px",
+      borderRadius: 20,
+      border: "2px solid " + (addEvType === key ? t.color : "#d4c5b0"),
+      background: addEvType === key ? t.bg : "transparent",
+      color: addEvType === key ? t.color : "#7a5c44",
+      fontSize: 12,
+      fontWeight: 600,
+      cursor: "pointer"
+    }
+  }, /*#__PURE__*/React.createElement(AppIcon, {
+    name: t.icon,
+    color: addEvType === key ? t.color : "var(--text-mid)",
+    size: 14
+  }), t.label))), addEvType && ((_EVENT_TYPES$addEvTyp = EVENT_TYPES[addEvType]) === null || _EVENT_TYPES$addEvTyp === void 0 ? void 0 : _EVENT_TYPES$addEvTyp.range) && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 10
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: {
+      display: "block",
+      fontSize: 12,
+      color: "#7a5c44",
+      marginBottom: 4
+    }
+  }, "\u05EA\u05D0\u05E8\u05D9\u05DA \u05E1\u05D9\u05D5\u05DD \u05D4\u05E8\u05D9\u05D5\u05DF (\u05D0\u05DD \u05D9\u05D3\u05D5\u05E2):"), /*#__PURE__*/React.createElement("input", {
+    type: "date",
+    value: evEndDate,
+    onChange: e => setEvEndDate(e.target.value),
+    min: selectedDate,
+    style: {
+      width: "100%",
+      padding: "8px 12px",
+      borderRadius: 9,
+      border: "2px solid #d8c8f0",
+      background: "#fdf6ef",
+      fontSize: 14,
+      outline: "none",
+      direction: "ltr"
+    }
+  })), addEvType && /*#__PURE__*/React.createElement("button", {
+    onClick: saveEvent,
+    style: {
+      width: "100%",
+      padding: "10px",
+      background: "linear-gradient(135deg,#8a5c3a,#6b3f22)",
+      color: "white",
+      border: "none",
+      borderRadius: 10,
+      fontWeight: 700,
+      fontSize: 13,
+      cursor: "pointer"
+    }
+  }, "\u2713 \u05E9\u05DE\u05D5\u05E8 ", (_EVENT_TYPES$addEvTyp2 = EVENT_TYPES[addEvType]) === null || _EVENT_TYPES$addEvTyp2 === void 0 ? void 0 : _EVENT_TYPES$addEvTyp2.label)), selectedDateMarks && (selectedDateMarks.type === "clean" || selectedDateMarks.type === "mikveh" || selectedDateMarks.type === "hefsek") && /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      setView("days");
+      setSelectedDate(null);
+    },
+    style: {
+      width: "100%",
+      marginTop: 8,
+      padding: "9px",
+      background: "#f0e4d4",
+      color: "#6b3f22",
+      border: "none",
+      borderRadius: 10,
+      fontWeight: 600,
+      fontSize: 13,
+      cursor: "pointer"
+    }
+  }, "\u2192 \u05E4\u05EA\u05D7\u05D9 \u05DC\u05E9\u05D5\u05E0\u05D9\u05EA \u05E1\u05E4\u05D9\u05E8\u05D4")), activeCycle ? /*#__PURE__*/React.createElement("div", {
+    className: "card",
+    style: {
+      padding: "14px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 700,
+      fontSize: 12,
+      color: "var(--primary)",
+      marginBottom: 10,
+      letterSpacing: 0.5,
+      textTransform: "uppercase",
+      opacity: 0.7
+    }
+  }, "\u05DE\u05D7\u05D6\u05D5\u05E8 \u05E0\u05D5\u05DB\u05D7\u05D9"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "grid",
+      gridTemplateColumns: "1fr 1fr 1fr",
+      gap: 8,
+      textAlign: "center"
+    }
+  }, [["drop", activeCycle.bleedCount + "י", "דימום", "var(--red-bg)", "var(--red-mid)"], ["leaf", activeCycle.days.filter(d => d.morning === "clean" && d.evening === "clean").length + "/7", "נקיים", "var(--green-bg)", "var(--green)"], ["wave", formatShort(activeCycle.mikvehDate), "טבילה", "var(--blue-bg)", "var(--blue)"]].map(([ic, val, lbl, bg, icColor]) => /*#__PURE__*/React.createElement("div", {
+    key: lbl,
+    style: {
+      background: bg,
+      borderRadius: 12,
+      padding: "10px 4px",
+      border: "1px solid var(--border-light)"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "center",
+      marginBottom: 3
+    }
+  }, /*#__PURE__*/React.createElement(AppIcon, {
+    name: ic,
+    color: icColor,
+    size: 20
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 800,
+      fontSize: 15,
+      color: "var(--primary)"
+    }
+  }, val), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      color: "var(--text-light)",
+      marginTop: 2
+    }
+  }, lbl))))) : /*#__PURE__*/React.createElement("button", {
+    onClick: () => setShowNewCycle(true),
+    className: "btn-primary",
+    style: {
+      width: "100%",
+      padding: "16px",
+      fontSize: 15,
+      borderRadius: 14,
+      boxShadow: "0 6px 20px rgba(61,26,46,0.3)"
+    }
+  }, "\u05D4\u05EA\u05D7\u05DC\u05D9 \u05DE\u05D7\u05D6\u05D5\u05E8 \u05E8\u05D0\u05E9\u05D5\u05DF"));
+}
+
+// ─── EDIT CYCLE MODAL ────────────────────────
+function EditCycleModal({
+  cycle,
+  setCycles,
+  onClose
+}) {
+  const [bleedStart, setBleedStart] = useState(cycle.bleedStart);
+  const [bleedCount, setBleedCount] = useState(cycle.bleedCount);
+  const [hefsekDate, setHefsekDate] = useState(cycle.hefsekDate || "");
+  const [manualStart, setManualStart] = useState("");
+  const [onahStart, setOnahStart] = useState(cycle.onahStart || "day");
+  const [cycleType, setCycleType] = useState(cycle.cycleType || "regular");
+  const hefsekAuto = addDays(bleedStart, bleedCount - 1);
+  const hefsekFinal = hefsekDate || hefsekAuto;
+  const startDate = manualStart || addDays(hefsekFinal, 1);
+  const mikvehDate = addDays(startDate, 6);
+  function save() {
+    setCycles(p => p.map(c => c.id !== cycle.id ? c : {
+      ...c,
+      bleedStart,
+      bleedCount,
+      hefsekDate: hefsekDate || null,
+      onahStart,
+      cycleType,
+      startDate,
+      mikvehDate,
+      days: c.days.map((d, i) => ({
+        ...d,
+        date: addDays(startDate, i)
+      }))
+    }));
+    onClose();
+  }
+  const typeInfo = CYCLE_TYPES.find(t => t.key === cycleType) || CYCLE_TYPES[0];
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "fixed",
+      inset: 0,
+      zIndex: 200,
+      display: "flex",
+      alignItems: "flex-end",
+      justifyContent: "center",
+      background: "rgba(0,0,0,0.5)"
+    },
+    onClick: onClose
+  }, /*#__PURE__*/React.createElement("div", {
+    onClick: e => e.stopPropagation(),
+    className: "slide-up",
+    style: {
+      width: "100%",
+      maxWidth: 520,
+      background: "var(--card)",
+      borderRadius: "20px 20px 0 0",
+      padding: "20px 16px 40px",
+      maxHeight: "88vh",
+      overflowY: "auto",
+      borderTop: "3px solid var(--gold)"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 16
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: "'Secular One',sans-serif",
+      fontSize: 18,
+      fontWeight: 700,
+      color: "var(--primary)"
+    }
+  }, "\u05E2\u05E8\u05D9\u05DB\u05EA \u05DE\u05D7\u05D6\u05D5\u05E8"), /*#__PURE__*/React.createElement("button", {
+    onClick: onClose,
+    style: {
+      background: "none",
+      border: "none",
+      cursor: "pointer",
+      padding: 4
+    }
+  }, /*#__PURE__*/React.createElement("svg", {
+    width: "18",
+    height: "18",
+    viewBox: "0 0 16 16",
+    fill: "none",
+    stroke: "var(--text-light)",
+    strokeWidth: "2",
+    strokeLinecap: "round"
+  }, /*#__PURE__*/React.createElement("line", {
+    x1: "3",
+    y1: "3",
+    x2: "13",
+    y2: "13"
+  }), /*#__PURE__*/React.createElement("line", {
+    x1: "13",
+    y1: "3",
+    x2: "3",
+    y2: "13"
+  })))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      marginBottom: 14
+    }
+  }, CYCLE_TYPES.map(t => /*#__PURE__*/React.createElement("button", {
+    key: t.key,
+    onClick: () => setCycleType(t.key),
+    style: {
+      flex: 1,
+      padding: "8px 4px",
+      borderRadius: 11,
+      cursor: "pointer",
+      border: `2px solid ${cycleType === t.key ? t.color : "var(--border)"}`,
+      background: cycleType === t.key ? t.color + "18" : "var(--bg)",
+      color: cycleType === t.key ? t.color : "var(--text-mid)",
+      fontWeight: cycleType === t.key ? 700 : 400,
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      gap: 3
+    }
+  }, /*#__PURE__*/React.createElement(AppIcon, {
+    name: t.key === "regular" ? "moon" : "birth",
+    color: cycleType === t.key ? t.color : "var(--text-light)",
+    size: 18
+  }), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 10
+    }
+  }, t.label)))), /*#__PURE__*/React.createElement("label", {
+    style: {
+      display: "block",
+      fontSize: 12,
+      color: "var(--text-mid)",
+      fontWeight: 500,
+      marginBottom: 5
+    }
+  }, typeInfo.key === "regular" ? "תאריך תחילת דימום:" : "תאריך לידה / תחילת דימום:"), /*#__PURE__*/React.createElement("input", {
+    type: "date",
+    value: bleedStart,
+    onChange: e => {
+      setBleedStart(e.target.value);
+      setHefsekDate("");
+      setManualStart("");
+    },
+    style: {
+      width: "100%",
+      padding: "9px 12px",
+      borderRadius: 10,
+      border: "1.5px solid var(--border)",
+      background: "var(--bg)",
+      fontSize: 15,
+      outline: "none",
+      direction: "ltr",
+      color: "var(--text)",
+      marginBottom: 14
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 6
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 12,
+      color: "var(--text-mid)",
+      fontWeight: 500
+    }
+  }, "\u05DE\u05E1\u05E4\u05E8 \u05D9\u05DE\u05D9 \u05D3\u05D9\u05DE\u05D5\u05DD:"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontWeight: 800,
+      fontSize: 18,
+      color: "var(--red-mid)"
+    }
+  }, bleedCount)), /*#__PURE__*/React.createElement("input", {
+    type: "range",
+    min: typeInfo.minBleed,
+    max: typeInfo.maxBleed,
+    value: bleedCount,
+    onChange: e => {
+      setBleedCount(Number(e.target.value));
+      setHefsekDate("");
+      setManualStart("");
+    },
+    style: {
+      width: "100%",
+      accentColor: typeInfo.color,
+      marginBottom: 14
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#f0f8e8",
+      borderRadius: 11,
+      padding: "11px 13px",
+      marginBottom: 12,
+      border: "1px solid #B8D8B0"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center"
+    }
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 5,
+      fontSize: 12,
+      color: "var(--green)",
+      fontWeight: 600
+    }
+  }, /*#__PURE__*/React.createElement(AppIcon, {
+    name: "drop-line",
+    color: "var(--green)",
+    size: 13
+  }), "\u05D4\u05E4\u05E1\u05E7 \u05D8\u05D4\u05E8\u05D4"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "var(--text-light)",
+      marginTop: 1
+    }
+  }, hefsekDate ? formatDate(hefsekDate) : `אוטומטי: ${formatDate(hefsekAuto)}`)), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setHefsekDate(d => d ? "" : hefsekAuto),
+    style: {
+      padding: "4px 9px",
+      borderRadius: 14,
+      border: `1px solid ${hefsekDate ? "#e07070" : "#5A9B72"}`,
+      background: hefsekDate ? "#ffeaea" : "#DDF0DA",
+      color: hefsekDate ? "#c04040" : "var(--green)",
+      fontSize: 11,
+      fontWeight: 600,
+      cursor: "pointer"
+    }
+  }, hefsekDate ? "בטל" : "שנה")), hefsekDate && /*#__PURE__*/React.createElement("input", {
+    type: "date",
+    value: hefsekDate,
+    min: addDays(bleedStart, bleedCount - 1),
+    onChange: e => setHefsekDate(e.target.value),
+    style: {
+      width: "100%",
+      padding: "8px 12px",
+      borderRadius: 8,
+      border: "1.5px solid var(--green-mid)",
+      background: "white",
+      fontSize: 14,
+      outline: "none",
+      direction: "ltr",
+      marginTop: 8
+    }
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#f5f0fb",
+      borderRadius: 11,
+      padding: "11px 13px",
+      marginBottom: 12,
+      border: "1px solid #d8c8f0"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center"
+    }
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 5,
+      fontSize: 12,
+      color: "var(--purple)",
+      fontWeight: 600
+    }
+  }, /*#__PURE__*/React.createElement(AppIcon, {
+    name: "leaf",
+    color: "var(--purple)",
+    size: 13
+  }), "\u05EA\u05D7\u05D9\u05DC\u05EA \u05E1\u05E4\u05D9\u05E8\u05D4"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "#8070a0",
+      marginTop: 1
+    }
+  }, manualStart ? formatDate(manualStart) : formatDate(addDays(hefsekFinal, 1)))), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setManualStart(s => s ? "" : addDays(hefsekFinal, 1)),
+    style: {
+      padding: "4px 9px",
+      borderRadius: 14,
+      border: `1px solid ${manualStart ? "#e07070" : "#9070c0"}`,
+      background: manualStart ? "#ffeaea" : "#ede8f8",
+      color: manualStart ? "#c04040" : "#6040a0",
+      fontSize: 11,
+      fontWeight: 600,
+      cursor: "pointer"
+    }
+  }, manualStart ? "בטל" : "שנה")), manualStart && /*#__PURE__*/React.createElement("input", {
+    type: "date",
+    value: manualStart,
+    min: addDays(hefsekFinal, 1),
+    onChange: e => setManualStart(e.target.value),
+    style: {
+      width: "100%",
+      padding: "8px 12px",
+      borderRadius: 8,
+      border: "1.5px solid #9070c0",
+      background: "white",
+      fontSize: 14,
+      outline: "none",
+      direction: "ltr",
+      marginTop: 8
+    }
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "grid",
+      gridTemplateColumns: "1fr 1fr",
+      gap: 8,
+      marginBottom: 14
+    }
+  }, [["day", "sun", "עונת יום"], ["night", "moon", "עונת לילה"]].map(([key, ic, label]) => /*#__PURE__*/React.createElement("button", {
+    key: key,
+    onClick: () => setOnahStart(key),
+    style: {
+      padding: "9px",
+      borderRadius: 11,
+      cursor: "pointer",
+      textAlign: "center",
+      border: `2px solid ${onahStart === key ? "var(--primary-mid)" : "var(--border)"}`,
+      background: onahStart === key ? key === "day" ? "#FDF6E3" : "#0D0B20" : "var(--bg)"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "center",
+      marginBottom: 3
+    }
+  }, /*#__PURE__*/React.createElement(AppIcon, {
+    name: key,
+    color: onahStart === key ? key === "day" ? "var(--gold)" : "#A0B4FF" : "var(--text-light)",
+    size: 18
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 600,
+      fontSize: 12,
+      color: onahStart === key ? key === "day" ? "var(--gold)" : "#A0B4FF" : "var(--text-mid)"
+    }
+  }, label)))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "var(--gold-bg)",
+      borderRadius: 10,
+      padding: "10px 13px",
+      marginBottom: 16,
+      border: "1px solid #D4AE5A44"
+    }
+  }, [["drop", "סיום דימום", formatDate(addDays(bleedStart, bleedCount - 1)), "var(--red-mid)"], ["drop-line", "הפסק טהרה", formatDate(hefsekFinal), "var(--green)"], ["leaf", "תחילת ספירה", formatDate(startDate), "var(--purple)"], ["wave", "טבילה", formatDate(mikvehDate), "var(--green)"]].map(([ic, lbl, val, col]) => /*#__PURE__*/React.createElement("div", {
+    key: lbl,
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      marginBottom: 4
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 4,
+      fontSize: 12,
+      color: "var(--text-mid)"
+    }
+  }, /*#__PURE__*/React.createElement(AppIcon, {
+    name: ic,
+    color: col,
+    size: 12
+  }), lbl, ":"), /*#__PURE__*/React.createElement("strong", {
+    style: {
+      fontSize: 12,
+      color: col
+    }
+  }, val)))), /*#__PURE__*/React.createElement("button", {
+    onClick: save,
+    className: "btn-primary",
+    style: {
+      width: "100%",
+      padding: "13px",
+      fontSize: 15,
+      borderRadius: 12
+    }
+  }, "\u2713 \u05E9\u05DE\u05D5\u05E8 \u05E9\u05D9\u05E0\u05D5\u05D9\u05D9\u05DD")));
+}
+
+// ─── MIKVEH PREPARATION SHEET ────────────────
+const PREP_SECTIONS = [{
+  id: "remove",
+  icon: "drop",
+  color: "var(--purple)",
+  bg: "var(--purple-bg)",
+  title: "הסרת חציצות",
+  subtitle: "לפני הרחצה",
+  items: [{
+    id: "jewelry",
+    label: "תכשיטים",
+    detail: "עגילים, טבעות, שרשראות, שעון"
+  }, {
+    id: "cosmetics",
+    label: "קוסמטיקה",
+    detail: "איפור, לק (אם אינו שלם), בושם, דאודורנט"
+  }, {
+    id: "body",
+    label: "גוף",
+    detail: "עדשות מגע, פלסטרים, דבק, שאריות צבע"
+  }, {
+    id: "nails",
+    label: "ציפורניים",
+    detail: "גזיזה וניקוי יסודי תחת הציפורניים"
+  }]
+}, {
+  id: "wash",
+  icon: "wave",
+  color: "var(--blue)",
+  bg: "var(--blue-bg)",
+  title: "רחצה וחפיפה",
+  subtitle: 'ה"חפיפה"',
+  items: [{
+    id: "hotwater",
+    label: "מים חמים",
+    detail: "רחצה יסודית של כל הגוף לריכוך העור"
+  }, {
+    id: "hair",
+    label: "שיער",
+    detail: "חפיפה יסודית של הראש וכל מקום שיש בו שיער"
+  }, {
+    id: "comb",
+    label: "סירוק",
+    detail: "סירוק בעודו רטוב — אין קשרים"
+  }, {
+    id: "hidden",
+    label: 'מקומות "נסתרים"',
+    detail: "בית שחי, טבור, מאחורי אוזניים, בין אצבעות"
+  }, {
+    id: "teeth",
+    label: "שיניים",
+    detail: "צחצוח יסודי וחוט דנטלי"
+  }]
+}, {
+  id: "final",
+  icon: "check-circle",
+  color: "var(--green)",
+  bg: "var(--green-bg)",
+  title: "בדיקה סופית",
+  subtitle: "סמוך לטבילה",
+  items: [{
+    id: "selfcheck",
+    label: "בדיקה עצמית",
+    detail: "מראה ומישוש — לוודא שאין לכלוך שפוספס"
+  }, {
+    id: "lastcomb",
+    label: "סירוק אחרון",
+    detail: "מסרק ממש לפני הכניסה למים"
+  }, {
+    id: "bathroom",
+    label: "התרוקנות",
+    detail: "כדאי להתפנות לפני הטבילה"
+  }]
+}, {
+  id: "gear",
+  icon: "save",
+  color: "var(--gold)",
+  bg: "var(--gold-bg)",
+  title: "ציוד למקווה",
+  subtitle: "אם לא משתמשים בציוד המקום",
+  items: [{
+    id: "towel",
+    label: "מגבת וחלוק",
+    detail: "מגבת גדולה וחלוק"
+  }, {
+    id: "sandals",
+    label: 'כפכפי גומי',
+    detail: ""
+  }, {
+    id: "comb2",
+    label: "מסרק ומברשת",
+    detail: "מסרק + מברשת שיניים"
+  }, {
+    id: "soap",
+    label: "סבון ושמפו",
+    detail: ""
+  }, {
+    id: "clothes",
+    label: "בגדים נקיים",
+    detail: ""
+  }]
+}];
+function MikvehPrepSheet({
+  onClose,
+  mikvehDate
+}) {
+  const [checked, setChecked] = useState({});
+  const [openSection, setOpenSection] = useState("remove");
+  const totalItems = PREP_SECTIONS.reduce((s, sec) => s + sec.items.length, 0);
+  const checkedCount = Object.values(checked).filter(Boolean).length;
+  const pct = Math.round(checkedCount / totalItems * 100);
+  function toggle(id) {
+    setChecked(c => ({
+      ...c,
+      [id]: !c[id]
+    }));
+  }
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "fixed",
+      inset: 0,
+      zIndex: 300,
+      display: "flex",
+      alignItems: "flex-end",
+      justifyContent: "center",
+      background: "rgba(0,0,0,0.55)"
+    },
+    onClick: onClose
+  }, /*#__PURE__*/React.createElement("div", {
+    onClick: e => e.stopPropagation(),
+    className: "slide-up",
+    style: {
+      width: "100%",
+      maxWidth: 520,
+      background: "var(--card)",
+      borderRadius: "22px 22px 0 0",
+      maxHeight: "90vh",
+      overflowY: "auto",
+      borderTop: "3px solid var(--green-mid)"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "18px 18px 0",
+      position: "sticky",
+      top: 0,
+      background: "var(--card)",
+      zIndex: 10
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 10
+    }
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      fontFamily: "'Secular One',sans-serif",
+      fontSize: 18,
+      fontWeight: 700,
+      color: "var(--green)"
+    }
+  }, /*#__PURE__*/React.createElement(AppIcon, {
+    name: "wave",
+    color: "var(--green)",
+    size: 22
+  }), "\u05D4\u05DB\u05E0\u05D5\u05EA \u05DC\u05E7\u05E8\u05D0\u05EA \u05D4\u05D8\u05D1\u05D9\u05DC\u05D4"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "var(--text-light)",
+      marginTop: 2
+    }
+  }, formatDate(mikvehDate))), /*#__PURE__*/React.createElement("button", {
+    onClick: onClose,
+    style: {
+      background: "none",
+      border: "none",
+      cursor: "pointer",
+      padding: 4
+    }
+  }, /*#__PURE__*/React.createElement("svg", {
+    width: "18",
+    height: "18",
+    viewBox: "0 0 16 16",
+    fill: "none",
+    stroke: "var(--text-light)",
+    strokeWidth: "2",
+    strokeLinecap: "round"
+  }, /*#__PURE__*/React.createElement("line", {
+    x1: "3",
+    y1: "3",
+    x2: "13",
+    y2: "13"
+  }), /*#__PURE__*/React.createElement("line", {
+    x1: "13",
+    y1: "3",
+    x2: "3",
+    y2: "13"
+  })))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      fontSize: 11,
+      color: "var(--text-light)",
+      marginBottom: 5
+    }
+  }, /*#__PURE__*/React.createElement("span", null, "\u05E1\u05D4\"\u05DB \u05D4\u05D5\u05E9\u05DC\u05DD"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontWeight: 700,
+      color: pct === 100 ? "var(--green)" : "var(--text-mid)"
+    }
+  }, checkedCount, "/", totalItems)), /*#__PURE__*/React.createElement("div", {
+    style: {
+      height: 6,
+      background: "var(--bg3)",
+      borderRadius: 10,
+      overflow: "hidden"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      height: "100%",
+      borderRadius: 10,
+      width: `${pct}%`,
+      background: "linear-gradient(90deg,var(--gold-light),var(--green-mid))",
+      transition: "width 0.4s"
+    }
+  }))), pct === 100 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "var(--green-bg)",
+      borderRadius: 10,
+      padding: "9px 12px",
+      marginBottom: 12,
+      border: "1px solid var(--green-mid)44",
+      textAlign: "center",
+      fontSize: 13,
+      color: "var(--green)",
+      fontWeight: 700
+    }
+  }, "\u05DE\u05D5\u05DB\u05E0\u05D4 \u05DC\u05D8\u05D1\u05D9\u05DC\u05D4! \uD83C\uDF38")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "0 16px 32px"
+    }
+  }, PREP_SECTIONS.map(sec => {
+    const secChecked = sec.items.filter(it => checked[it.id]).length;
+    const allDone = secChecked === sec.items.length;
+    const isOpen = openSection === sec.id;
+    return /*#__PURE__*/React.createElement("div", {
+      key: sec.id,
+      style: {
+        marginBottom: 10,
+        borderRadius: "var(--radius)",
+        overflow: "hidden",
+        border: `1px solid ${allDone ? "var(--green-mid)44" : "var(--border)"}`,
+        transition: "border-color 0.3s"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      onClick: () => setOpenSection(isOpen ? "" : sec.id),
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        padding: "12px 14px",
+        cursor: "pointer",
+        background: allDone ? "var(--green-bg)" : sec.bg
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        width: 36,
+        height: 36,
+        borderRadius: 10,
+        background: allDone ? "var(--green)" : sec.color,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        flexShrink: 0,
+        transition: "background 0.3s"
+      }
+    }, /*#__PURE__*/React.createElement(AppIcon, {
+      name: allDone ? "check-circle" : sec.icon,
+      color: "white",
+      size: 18
+    })), /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontWeight: 700,
+        fontSize: 13,
+        color: allDone ? "var(--green)" : sec.color
+      }
+    }, sec.title), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 10,
+        color: "var(--text-light)"
+      }
+    }, sec.subtitle, " \xB7 ", secChecked, "/", sec.items.length)), /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: "var(--text-light)",
+        fontSize: 11,
+        transform: isOpen ? "rotate(180deg)" : "none",
+        transition: "transform 0.2s",
+        display: "inline-block"
+      }
+    }, "\u25BC")), isOpen && /*#__PURE__*/React.createElement("div", {
+      style: {
+        padding: "4px 0 8px"
+      },
+      className: "fade-in"
+    }, sec.items.map(item => /*#__PURE__*/React.createElement("div", {
+      key: item.id,
+      onClick: () => toggle(item.id),
+      style: {
+        display: "flex",
+        alignItems: "flex-start",
+        gap: 10,
+        padding: "10px 14px",
+        cursor: "pointer",
+        background: checked[item.id] ? "rgba(58,107,80,0.04)" : "transparent",
+        borderBottom: "1px solid var(--border-light)",
+        transition: "background 0.15s"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        width: 22,
+        height: 22,
+        borderRadius: 6,
+        flexShrink: 0,
+        marginTop: 1,
+        border: `2px solid ${checked[item.id] ? "var(--green-mid)" : "var(--border)"}`,
+        background: checked[item.id] ? "var(--green-mid)" : "transparent",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        transition: "all 0.15s"
+      }
+    }, checked[item.id] && /*#__PURE__*/React.createElement("svg", {
+      width: "12",
+      height: "12",
+      viewBox: "0 0 12 12",
+      fill: "none",
+      stroke: "white",
+      strokeWidth: "2.5",
+      strokeLinecap: "round"
+    }, /*#__PURE__*/React.createElement("polyline", {
+      points: "2,6 5,9 10,3"
+    }))), /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 13,
+        fontWeight: 600,
+        color: checked[item.id] ? "var(--green)" : "var(--text)",
+        textDecoration: checked[item.id] ? "line-through" : "none",
+        transition: "color 0.15s"
+      }
+    }, item.label), item.detail && /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: "var(--text-light)",
+        marginTop: 2
+      }
+    }, item.detail))))));
+  }))));
+}
+function MikvehCard({
+  cycle,
+  updateCycle
+}) {
+  const [showPrep, setShowPrep] = useState(false);
+  return /*#__PURE__*/React.createElement(React.Fragment, null, showPrep && /*#__PURE__*/React.createElement(MikvehPrepSheet, {
+    onClose: () => setShowPrep(false),
+    mikvehDate: cycle.mikvehDate
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: cycle.mikvehDone ? "linear-gradient(135deg,var(--green-bg),#D4EDE0)" : "var(--card)",
+      borderRadius: "var(--radius)",
+      padding: "18px",
+      marginBottom: 14,
+      border: `2px solid ${cycle.mikvehDone ? "var(--green-mid)" : "var(--border)"}`,
+      boxShadow: cycle.mikvehDone ? "0 4px 20px rgba(58,107,80,0.15)" : "0 2px 12px var(--shadow)",
+      transition: "all 0.3s"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      fontFamily: "'Secular One',sans-serif",
+      fontWeight: 700,
+      fontSize: 17,
+      color: cycle.mikvehDone ? "var(--green)" : "var(--text)",
+      marginBottom: 3
+    }
+  }, /*#__PURE__*/React.createElement(AppIcon, {
+    name: "wave",
+    color: cycle.mikvehDone ? "var(--green)" : "var(--primary-mid)",
+    size: 20
+  }), "\u05D8\u05D1\u05D9\u05DC\u05D4 \u05D1\u05DE\u05E7\u05D5\u05D5\u05D4"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: "var(--text-light)"
+    }
+  }, formatDate(cycle.mikvehDate))), /*#__PURE__*/React.createElement("button", {
+    onClick: () => updateCycle(cycle.id, "mikvehDone", !cycle.mikvehDone),
+    className: "btn-primary",
+    style: {
+      padding: "10px 18px",
+      fontSize: 13,
+      borderRadius: 24
+    }
+  }, cycle.mikvehDone ? "✓ בוצע" : "סמן כבוצע")), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setShowPrep(true),
+    style: {
+      width: "100%",
+      padding: "10px",
+      borderRadius: 10,
+      border: `1.5px solid ${cycle.mikvehDone ? "var(--green-mid)" : "var(--border)"}`,
+      background: cycle.mikvehDone ? "rgba(58,107,80,0.08)" : "var(--bg)",
+      color: cycle.mikvehDone ? "var(--green)" : "var(--text-mid)",
+      fontWeight: 600,
+      fontSize: 13,
+      cursor: "pointer",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 6
+    }
+  }, /*#__PURE__*/React.createElement(AppIcon, {
+    name: "check-circle",
+    color: cycle.mikvehDone ? "var(--green)" : "var(--text-light)",
+    size: 15
+  }), "\u05E8\u05E9\u05D9\u05DE\u05EA \u05D4\u05DB\u05E0\u05D5\u05EA \u05DC\u05D8\u05D1\u05D9\u05DC\u05D4"), cycle.mikvehDone && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 10,
+      padding: "10px",
+      background: "rgba(58,107,80,0.1)",
+      borderRadius: 10,
+      textAlign: "center",
+      fontSize: 14,
+      color: "var(--green)",
+      fontWeight: 700
+    }
+  }, "\u05DE\u05D6\u05DC \u05D8\u05D5\u05D1! \u05D4\u05DE\u05D7\u05D6\u05D5\u05E8 \u05D4\u05D5\u05E9\u05DC\u05DD \u05D1\u05D4\u05E6\u05DC\u05D7\u05D4")));
+}
+
+// ─── DAYS VIEW ───────────────────────────────
+function DaysView({
+  cycle,
+  updateDay,
+  updateCycle,
+  setCycles,
+  getCycleStatus,
+  settings,
+  onDelete
+}) {
+  const status = getCycleStatus(cycle);
+  const cleanDays = cycle.days.filter(d => d.morning === "clean" && d.evening === "clean").length;
+  const [showEdit, setShowEdit] = useState(false);
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "14px 16px"
+    },
+    className: "fade-in"
+  }, showEdit && /*#__PURE__*/React.createElement(EditCycleModal, {
+    cycle: cycle,
+    setCycles: setCycles,
+    onClose: () => setShowEdit(false)
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "card",
+    style: {
+      padding: "16px",
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "flex-start",
+      marginBottom: 10
+    }
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 6,
+      alignItems: "center",
+      marginBottom: 2
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "#9a7a5a"
+    }
+  }, "\u05EA\u05D7\u05D9\u05DC\u05EA \u05E1\u05E4\u05D9\u05E8\u05D4"), cycle.cycleType === "boy" && /*#__PURE__*/React.createElement("span", {
+    style: {
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 3,
+      background: "var(--blue-bg)",
+      color: "var(--blue)",
+      borderRadius: 7,
+      padding: "2px 7px",
+      fontSize: 10,
+      fontWeight: 600
+    }
+  }, /*#__PURE__*/React.createElement(AppIcon, {
+    name: "birth",
+    color: "var(--blue)",
+    size: 11
+  }), "\u05DC\u05D9\u05D3\u05EA \u05D1\u05DF"), cycle.cycleType === "girl" && /*#__PURE__*/React.createElement("span", {
+    style: {
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 3,
+      background: "#FFF0F6",
+      color: "var(--primary-light)",
+      borderRadius: 7,
+      padding: "2px 7px",
+      fontSize: 10,
+      fontWeight: 600
+    }
+  }, /*#__PURE__*/React.createElement(AppIcon, {
+    name: "birth",
+    color: "var(--primary-light)",
+    size: 11
+  }), "\u05DC\u05D9\u05D3\u05EA \u05D1\u05EA")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 600,
+      fontSize: 13
+    }
+  }, formatDate(cycle.startDate))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "flex-start",
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      textAlign: "left"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "#9a7a5a",
+      marginBottom: 2
+    }
+  }, "\u05D8\u05D1\u05D9\u05DC\u05D4"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 600,
+      fontSize: 13,
+      color: "#5a9878"
+    }
+  }, formatDate(cycle.mikvehDate))), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setShowEdit(true),
+    style: {
+      width: 32,
+      height: 32,
+      borderRadius: "50%",
+      border: "1.5px solid var(--border)",
+      background: "var(--bg)",
+      cursor: "pointer",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      flexShrink: 0,
+      marginTop: 2
+    }
+  }, /*#__PURE__*/React.createElement("svg", {
+    width: "14",
+    height: "14",
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "var(--text-mid)",
+    strokeWidth: "2",
+    strokeLinecap: "round",
+    strokeLinejoin: "round"
+  }, /*#__PURE__*/React.createElement("path", {
+    d: "M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"
+  }))))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "var(--red-bg)",
+      borderRadius: "var(--radius-sm)",
+      padding: "10px 14px",
+      marginBottom: 10,
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      border: "1px solid #F0C8C8"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 5,
+      fontSize: 13,
+      color: "var(--red)",
+      fontWeight: 600
+    }
+  }, /*#__PURE__*/React.createElement(AppIcon, {
+    name: "drop",
+    color: "var(--red)",
+    size: 14
+  }), "\u05D9\u05DE\u05D9 \u05D3\u05D9\u05DE\u05D5\u05DD"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      alignItems: "center"
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      const n = Math.max(1, cycle.bleedCount - 1);
+      const newStart = addDays(cycle.bleedStart, n);
+      setCycles(p => p.map(c => c.id !== cycle.id ? c : {
+        ...c,
+        bleedCount: n,
+        startDate: newStart,
+        mikvehDate: addDays(newStart, 6),
+        days: c.days.map((d, i) => ({
+          ...d,
+          date: addDays(newStart, i)
+        }))
+      }));
+    },
+    style: {
+      width: 28,
+      height: 28,
+      borderRadius: "50%",
+      border: "1.5px solid #E8B0B0",
+      background: "white",
+      color: "var(--red-mid)",
+      cursor: "pointer",
+      fontWeight: 700,
+      fontSize: 16,
+      boxShadow: "0 1px 4px rgba(0,0,0,0.08)"
+    }
+  }, "\u2212"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontWeight: 800,
+      fontSize: 18,
+      color: "var(--red-mid)",
+      minWidth: 28,
+      textAlign: "center"
+    }
+  }, cycle.bleedCount), /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      const n = Math.min(80, cycle.bleedCount + 1);
+      const newStart = addDays(cycle.bleedStart, n);
+      setCycles(p => p.map(c => c.id !== cycle.id ? c : {
+        ...c,
+        bleedCount: n,
+        startDate: newStart,
+        mikvehDate: addDays(newStart, 6),
+        days: c.days.map((d, i) => ({
+          ...d,
+          date: addDays(newStart, i)
+        }))
+      }));
+    },
+    style: {
+      width: 28,
+      height: 28,
+      borderRadius: "50%",
+      border: "1.5px solid #E8B0B0",
+      background: "white",
+      color: "var(--red-mid)",
+      cursor: "pointer",
+      fontWeight: 700,
+      fontSize: 16,
+      boxShadow: "0 1px 4px rgba(0,0,0,0.08)"
+    }
+  }, "+"))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 10
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      fontSize: 12,
+      color: "var(--text-mid)",
+      marginBottom: 5
+    }
+  }, /*#__PURE__*/React.createElement("span", null, "\u05D9\u05DE\u05D9\u05DD \u05E0\u05E7\u05D9\u05D9\u05DD"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontWeight: 700,
+      color: status === "stain" ? "var(--red-mid)" : cleanDays === 7 ? "var(--green)" : "var(--text-mid)"
+    }
+  }, cleanDays, " / 7")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      height: 7,
+      background: "var(--bg3)",
+      borderRadius: 10,
+      overflow: "hidden",
+      boxShadow: "inset 0 1px 3px rgba(0,0,0,0.08)"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      height: "100%",
+      borderRadius: 10,
+      width: `${cleanDays / 7 * 100}%`,
+      background: status === "stain" ? "linear-gradient(90deg,var(--red-mid),var(--red))" : "linear-gradient(90deg,var(--gold-light),var(--green-mid))",
+      transition: "width 0.5s cubic-bezier(.34,1,.64,1)",
+      boxShadow: cleanDays > 0 ? "0 0 8px rgba(90,155,114,0.4)" : "none"
+    }
+  }))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 5,
+      justifyContent: "center"
+    }
+  }, cycle.days.map((d, i) => {
+    const ok = d.morning === "clean" && d.evening === "clean",
+      bad = d.morning === "stain" || d.evening === "stain",
+      pesila = d.pesila;
+    return /*#__PURE__*/React.createElement("div", {
+      key: i,
+      style: {
+        width: 32,
+        height: 32,
+        borderRadius: "50%",
+        background: pesila ? "linear-gradient(135deg,#8B2828,var(--red))" : bad ? "linear-gradient(135deg,var(--red-mid),var(--red))" : ok ? "linear-gradient(135deg,var(--green-mid),var(--green))" : "var(--bg2)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontSize: 11,
+        fontWeight: 700,
+        color: ok || bad ? "white" : "var(--text-light)",
+        border: `2px solid ${pesila ? "#8B2828" : bad ? "var(--red-mid)" : ok ? "var(--green-mid)" : "var(--border)"}`,
+        boxShadow: ok || bad ? "0 2px 8px rgba(0,0,0,0.15)" : "none",
+        transition: "all 0.2s"
+      }
+    }, pesila ? "✕" : i + 1);
+  }))), cycle.days.map((day, i) => /*#__PURE__*/React.createElement(DayCard, {
+    key: i,
+    day: day,
+    idx: i,
+    cycleId: cycle.id,
+    updateDay: updateDay,
+    settings: settings,
+    defaultOpen: day.date === today(),
+    onPesila: idx => {
+      // Mark pesila + restart counting from day after
+      const newStart = addDays(cycle.days[idx].date, 1);
+      setCycles(p => p.map(c => c.id !== cycle.id ? c : {
+        ...c,
+        startDate: newStart,
+        mikvehDate: addDays(newStart, 6),
+        days: Array.from({
+          length: 7
+        }, (_, j) => ({
+          dayNum: j + 1,
+          date: addDays(newStart, j),
+          morning: null,
+          evening: null,
+          season: cycle.days[idx].season,
+          notes: "",
+          pesila: false
+        }))
+      }));
+      updateDay(cycle.id, idx, "pesila", true);
+    }
+  })), /*#__PURE__*/React.createElement(MikvehCard, {
+    cycle: cycle,
+    updateCycle: updateCycle
+  }), /*#__PURE__*/React.createElement(DeleteCycleButton, {
+    onDelete: onDelete,
+    cycleDate: formatDate(cycle.bleedStart)
+  }));
+}
+function DeleteCycleButton({
+  onDelete,
+  cycleDate
+}) {
+  const [confirm, setConfirm] = useState(false);
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 20
+    }
+  }, !confirm ? /*#__PURE__*/React.createElement("button", {
+    onClick: () => setConfirm(true),
+    style: {
+      width: "100%",
+      padding: "10px",
+      borderRadius: 10,
+      border: "1.5px solid var(--border)",
+      background: "transparent",
+      color: "var(--text-light)",
+      fontSize: 12,
+      fontWeight: 500,
+      cursor: "pointer",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 6,
+      transition: "all 0.2s"
+    }
+  }, /*#__PURE__*/React.createElement(AppIcon, {
+    name: "trash",
+    color: "var(--text-light)",
+    size: 14
+  }), "\u05DE\u05D7\u05D9\u05E7\u05EA \u05DE\u05D7\u05D6\u05D5\u05E8 \u05D6\u05D4") : /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "var(--red-bg)",
+      borderRadius: 12,
+      padding: "14px",
+      border: "1.5px solid var(--red-mid)"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13,
+      color: "var(--red)",
+      fontWeight: 600,
+      marginBottom: 4,
+      display: "flex",
+      alignItems: "center",
+      gap: 5
+    }
+  }, /*#__PURE__*/React.createElement(AppIcon, {
+    name: "alert",
+    color: "var(--red-mid)",
+    size: 14
+  }), "\u05DC\u05DE\u05D7\u05D5\u05E7 \u05D0\u05EA \u05D4\u05DE\u05D7\u05D6\u05D5\u05E8 \u05DE-", cycleDate, "?"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "var(--text-light)",
+      marginBottom: 12
+    }
+  }, "\u05E4\u05E2\u05D5\u05DC\u05D4 \u05D6\u05D5 \u05D0\u05D9\u05E0\u05D4 \u05E0\u05D9\u05EA\u05E0\u05EA \u05DC\u05D1\u05D9\u05D8\u05D5\u05DC"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: onDelete,
+    style: {
+      flex: 1,
+      padding: "9px",
+      borderRadius: 9,
+      background: "linear-gradient(135deg,var(--red-mid),var(--red))",
+      color: "white",
+      border: "none",
+      fontWeight: 700,
+      fontSize: 13,
+      cursor: "pointer"
+    }
+  }, "\u05DE\u05D7\u05E7"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setConfirm(false),
+    style: {
+      flex: 1,
+      padding: "9px",
+      borderRadius: 9,
+      background: "var(--bg)",
+      color: "var(--text-mid)",
+      border: "1.5px solid var(--border)",
+      fontWeight: 600,
+      fontSize: 13,
+      cursor: "pointer"
+    }
+  }, "\u05D1\u05D9\u05D8\u05D5\u05DC"))));
+}
+function DayCard({
+  day,
+  idx,
+  cycleId,
+  updateDay,
+  settings,
+  defaultOpen,
+  onPesila
+}) {
+  const [open, setOpen] = useState(defaultOpen || idx === 0);
+  const isClean = day.morning === "clean" && day.evening === "clean";
+  const hasStain = day.morning === "stain" || day.evening === "stain";
+  const eveningLabel = day.season === "night" ? "בדיקת לילה" : "בדיקה לפני השקיעה";
+  const eveningSub = day.season === "night" ? `לאחר ${settings.shkia || "19:30"} (צאת כוכבים)` : `לפני ${settings.shkia || "19:30"} (שקיעה)`;
+  const statusColor = hasStain ? "var(--red-mid)" : isClean ? "var(--green-mid)" : "var(--primary-mid)";
+  const statusBg = hasStain ? "var(--red-bg)" : isClean ? "var(--green-bg)" : "var(--card)";
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: statusBg,
+      borderRadius: "var(--radius)",
+      marginBottom: 10,
+      border: `1px solid ${hasStain ? "#F0C0C0" : isClean ? "#B0D8BC" : "var(--border)"}`,
+      boxShadow: "0 2px 12px var(--shadow)",
+      overflow: "hidden",
+      transition: "box-shadow 0.2s"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      height: 3,
+      background: hasStain ? "linear-gradient(90deg,var(--red),var(--red-mid))" : isClean ? "linear-gradient(90deg,var(--green-mid),var(--green))" : "linear-gradient(90deg,var(--primary-mid),var(--primary-light))",
+      borderRadius: "16px 16px 0 0"
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      padding: "11px 14px",
+      cursor: "pointer"
+    },
+    onClick: () => setOpen(o => !o)
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 36,
+      height: 36,
+      borderRadius: "50%",
+      background: hasStain ? "linear-gradient(135deg,var(--red-mid),var(--red))" : isClean ? "linear-gradient(135deg,var(--green-mid),var(--green))" : "linear-gradient(135deg,var(--primary-mid),var(--primary))",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      color: "white",
+      fontWeight: 800,
+      fontSize: 14,
+      flexShrink: 0,
+      marginLeft: 12,
+      boxShadow: `0 3px 10px ${hasStain ? "rgba(139,40,40,0.3)" : isClean ? "rgba(58,107,80,0.3)" : "rgba(61,26,46,0.3)"}`
+    }
+  }, hasStain ? "!" : isClean ? "✓" : day.dayNum), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 700,
+      fontSize: 13,
+      color: "var(--text)"
+    }
+  }, "\u05D9\u05D5\u05DD ", day.dayNum), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "var(--text-light)",
+      marginTop: 1
+    }
+  }, formatDate(day.date))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 6,
+      alignItems: "center"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    onClick: e => {
+      e.stopPropagation();
+      updateDay(cycleId, idx, "season", day.season === "day" ? "night" : "day");
+    },
+    style: {
+      padding: "4px 10px",
+      borderRadius: 20,
+      fontSize: 10,
+      fontWeight: 600,
+      cursor: "pointer",
+      background: day.season === "night" ? "#0D0B20" : "var(--gold-bg)",
+      color: day.season === "night" ? "#A0B4FF" : "var(--gold)",
+      border: `1px solid ${day.season === "night" ? "#2030A0" : "var(--gold-light)"}`,
+      transition: "all 0.2s"
+    }
+  }, day.season === "night" ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(AppIcon, {
+    name: "moon",
+    color: "#A0B4FF",
+    size: 11
+  }), " \u05DC\u05D9\u05DC\u05D4") : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(AppIcon, {
+    name: "sun",
+    color: "var(--gold)",
+    size: 11
+  }), " \u05D9\u05D5\u05DD")), /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "var(--text-light)",
+      fontSize: 11,
+      transition: "transform 0.2s",
+      display: "inline-block",
+      transform: open ? "rotate(180deg)" : "none"
+    }
+  }, "\u25BC"))), open && /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "0 14px 14px"
+    },
+    className: "fade-in"
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "grid",
+      gridTemplateColumns: "1fr 1fr",
+      gap: 8,
+      marginBottom: 10
+    }
+  }, [["morning", "sunrise", "בדיקת בוקר", `לאחר ${settings.netz || "06:15"} (הנץ)`], ["evening", "sunset", eveningLabel, eveningSub]].map(([field, ic, title, sub]) => {
+    const val = day[field];
+    return /*#__PURE__*/React.createElement("div", {
+      key: field,
+      style: {
+        background: "var(--bg)",
+        borderRadius: 12,
+        padding: "11px",
+        border: `1px solid ${val === "clean" ? "var(--green-mid)44" : val === "stain" ? "var(--red-mid)44" : "var(--border-light)"}`,
+        transition: "border-color 0.2s"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 4,
+        fontSize: 11,
+        fontWeight: 700,
+        color: "var(--primary-mid)",
+        marginBottom: 2
+      }
+    }, /*#__PURE__*/React.createElement(AppIcon, {
+      name: ic,
+      color: "var(--primary-mid)",
+      size: 12
+    }), title), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 9.5,
+        color: "var(--text-light)",
+        marginBottom: 8,
+        lineHeight: 1.4
+      }
+    }, sub), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        fontWeight: 700,
+        marginBottom: 8,
+        color: val === "clean" ? "var(--green)" : val === "stain" ? "var(--red-mid)" : "var(--text-light)"
+      }
+    }, val === "clean" ? /*#__PURE__*/React.createElement("span", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 3
+      }
+    }, /*#__PURE__*/React.createElement(AppIcon, {
+      name: "check-circle",
+      color: "var(--green)",
+      size: 11
+    }), "\u05E0\u05E7\u05D9") : val === "stain" ? /*#__PURE__*/React.createElement("span", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 3
+      }
+    }, /*#__PURE__*/React.createElement(AppIcon, {
+      name: "alert",
+      color: "var(--red-mid)",
+      size: 11
+    }), "\u05DB\u05EA\u05DD") : /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: "var(--text-light)"
+      }
+    }, "\u05DE\u05DE\u05EA\u05D9\u05DF")), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 5
+      }
+    }, /*#__PURE__*/React.createElement("button", {
+      onClick: () => updateDay(cycleId, idx, field, val === "clean" ? null : "clean"),
+      style: {
+        flex: 1,
+        padding: "6px 2px",
+        borderRadius: 8,
+        border: `2px solid ${val === "clean" ? "var(--green-mid)" : "var(--border)"}`,
+        background: val === "clean" ? "linear-gradient(135deg,var(--green-mid),var(--green))" : "transparent",
+        color: val === "clean" ? "white" : "var(--text-mid)",
+        fontWeight: 700,
+        fontSize: 11,
+        cursor: "pointer",
+        transition: "all 0.15s"
+      }
+    }, "\u2713 \u05E0\u05E7\u05D9"), /*#__PURE__*/React.createElement("button", {
+      onClick: () => updateDay(cycleId, idx, field, val === "stain" ? null : "stain"),
+      style: {
+        flex: 1,
+        padding: "6px 2px",
+        borderRadius: 8,
+        border: `2px solid ${val === "stain" ? "var(--red-mid)" : "var(--border)"}`,
+        background: val === "stain" ? "linear-gradient(135deg,var(--red-mid),var(--red))" : "transparent",
+        color: val === "stain" ? "white" : "var(--text-mid)",
+        fontWeight: 700,
+        fontSize: 11,
+        cursor: "pointer",
+        transition: "all 0.15s"
+      }
+    }, "! \u05DB\u05EA\u05DD")));
+  })), /*#__PURE__*/React.createElement("textarea", {
+    value: day.notes,
+    onChange: e => updateDay(cycleId, idx, "notes", e.target.value),
+    placeholder: "\u05D4\u05E2\u05E8\u05D5\u05EA \u05DC\u05D0\u05D5\u05EA\u05D5 \u05D9\u05D5\u05DD...",
+    rows: 2,
+    style: {
+      width: "100%",
+      padding: "9px 11px",
+      borderRadius: 10,
+      border: "1.5px solid var(--border)",
+      background: "var(--bg)",
+      fontSize: 12,
+      color: "var(--text)",
+      resize: "none",
+      outline: "none",
+      direction: "rtl",
+      lineHeight: 1.6
+    }
+  }), !day.pesila ? /*#__PURE__*/React.createElement("button", {
+    onClick: () => onPesila(idx),
+    style: {
+      width: "100%",
+      marginTop: 8,
+      padding: "8px",
+      borderRadius: 9,
+      border: "1.5px solid var(--red-mid)",
+      background: "transparent",
+      color: "var(--red-mid)",
+      fontSize: 11,
+      fontWeight: 600,
+      cursor: "pointer",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 5,
+      transition: "all 0.15s"
+    }
+  }, /*#__PURE__*/React.createElement(AppIcon, {
+    name: "alert",
+    color: "var(--red-mid)",
+    size: 12
+  }), "\u05E4\u05E1\u05D9\u05DC\u05D4 \u2014 \u05D4\u05EA\u05D7\u05DC\u05EA \u05E1\u05E4\u05D9\u05E8\u05D4 \u05DE\u05D7\u05D3\u05E9") : /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 8,
+      background: "var(--red-bg)",
+      borderRadius: 9,
+      padding: "8px 10px",
+      border: "1px solid var(--red-mid)44",
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      color: "var(--red-mid)",
+      fontWeight: 600,
+      display: "flex",
+      alignItems: "center",
+      gap: 4
+    }
+  }, /*#__PURE__*/React.createElement(AppIcon, {
+    name: "alert",
+    color: "var(--red-mid)",
+    size: 12
+  }), "\u05D9\u05D5\u05DD \u05D6\u05D4 \u05E0\u05E4\u05E1\u05DC"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => updateDay(cycleId, idx, "pesila", false),
+    style: {
+      fontSize: 10,
+      color: "var(--text-light)",
+      background: "none",
+      border: "none",
+      cursor: "pointer",
+      textDecoration: "underline"
+    }
+  }, "\u05D1\u05D8\u05DC"))));
+}
+
+// ─── MANUAL HAFLAGAH ─────────────────────────
+function ManualHaflagah({
+  lastBleedStart,
+  onah,
+  warnings,
+  setManualHaflagah
+}) {
+  const [days, setDays] = useState("");
+  const alreadyHas = warnings.some(w => w.type === "haflagah");
+  if (alreadyHas) return null;
+  return /*#__PURE__*/React.createElement("div", {
+    className: "card",
+    style: {
+      padding: "14px",
+      marginBottom: 12,
+      borderRight: "4px solid var(--blue)"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      marginBottom: 8
+    }
+  }, /*#__PURE__*/React.createElement(VesetIcon, {
+    type: "haflagah",
+    color: "var(--blue)",
+    size: 20
+  }), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 700,
+      fontSize: 13,
+      color: "var(--blue)"
+    }
+  }, "\u05D5\u05E1\u05EA \u05D4\u05D4\u05E4\u05DC\u05D2\u05D4"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "var(--text-light)"
+    }
+  }, "\u05E0\u05D3\u05E8\u05E9 \u05DE\u05D7\u05D6\u05D5\u05E8 \u05E7\u05D5\u05D3\u05DD \u05DC\u05D7\u05D9\u05E9\u05D5\u05D1 \u05D0\u05D5\u05D8\u05D5\u05DE\u05D8\u05D9"))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: "var(--text-mid)",
+      marginBottom: 10,
+      lineHeight: 1.6
+    }
+  }, "\u05D0\u05DD \u05D9\u05D3\u05D5\u05E2\u05D4 \u05DC\u05DA \u05D4\u05D4\u05E4\u05DC\u05D2\u05D4 \u05DE\u05D4\u05DE\u05D7\u05D6\u05D5\u05E8\u05D9\u05DD \u05D4\u05E7\u05D5\u05D3\u05DE\u05D9\u05DD, \u05D4\u05D6\u05D9\u05E0\u05D9 \u05D0\u05D5\u05EA\u05D4 \u05DB\u05D0\u05DF:"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      alignItems: "center"
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "number",
+    min: "1",
+    max: "90",
+    value: days,
+    onChange: e => setDays(e.target.value),
+    placeholder: "\u05DE\u05E1\u05E4\u05E8 \u05D9\u05DE\u05D9\u05DD",
+    style: {
+      flex: 1,
+      padding: "9px 12px",
+      borderRadius: 9,
+      border: "1.5px solid var(--border)",
+      background: "var(--bg)",
+      fontSize: 15,
+      outline: "none",
+      direction: "ltr",
+      color: "var(--text)"
+    }
+  }), /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      const n = parseInt(days);
+      if (!n || n < 1) return;
+      setManualHaflagah({
+        days: n,
+        date: addDays(lastBleedStart, n),
+        onah
+      });
+      setDays("");
+    },
+    className: "btn-primary",
+    style: {
+      padding: "9px 16px",
+      fontSize: 13,
+      borderRadius: 9,
+      whiteSpace: "nowrap"
+    }
+  }, "\u05D7\u05E9\u05D1")), days && parseInt(days) > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 8,
+      fontSize: 12,
+      color: "var(--blue)",
+      fontWeight: 500
+    }
+  }, "\u05D4\u05E4\u05DC\u05D2\u05D4 \u05E9\u05DC ", days, " \u05D9\u05DE\u05D9\u05DD \u2192 \u05D5\u05E1\u05EA \u05E6\u05E4\u05D5\u05D9: ", /*#__PURE__*/React.createElement("strong", null, formatDate(addDays(lastBleedStart, parseInt(days))))));
+}
+
+// ─── VESET ICONS ─────────────────────────────
+function VesetIcon({
+  type,
+  color,
+  size = 22
+}) {
+  const p = {
+    fill: "none",
+    stroke: color,
+    strokeWidth: 1.8,
+    strokeLinecap: "round",
+    strokeLinejoin: "round"
+  };
+  if (type === "beinonit") return /*#__PURE__*/React.createElement("svg", _extends({
+    width: size,
+    height: size,
+    viewBox: "0 0 24 24"
+  }, p), /*#__PURE__*/React.createElement("circle", {
+    cx: "12",
+    cy: "12",
+    r: "9"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M12 7v5l3 3",
+    strokeWidth: 2
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M5.5 5.5 C8 3 16 3 18.5 5.5",
+    strokeDasharray: "2 2"
+  }));
+  if (type === "haflagah") return /*#__PURE__*/React.createElement("svg", _extends({
+    width: size,
+    height: size,
+    viewBox: "0 0 24 24"
+  }, p), /*#__PURE__*/React.createElement("line", {
+    x1: "4",
+    y1: "12",
+    x2: "20",
+    y2: "12"
+  }), /*#__PURE__*/React.createElement("circle", {
+    cx: "4",
+    cy: "12",
+    r: "2.5",
+    fill: color,
+    stroke: "none"
+  }), /*#__PURE__*/React.createElement("circle", {
+    cx: "20",
+    cy: "12",
+    r: "2.5",
+    fill: color,
+    stroke: "none"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M4 7 C4 7 12 4 20 7",
+    strokeDasharray: "2 1.5"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M4 17 C4 17 12 20 20 17",
+    strokeDasharray: "2 1.5"
+  }));
+  if (type === "chodesh") return /*#__PURE__*/React.createElement("svg", _extends({
+    width: size,
+    height: size,
+    viewBox: "0 0 24 24"
+  }, p), /*#__PURE__*/React.createElement("path", {
+    d: "M12 4 a8 8 0 1 1 0 16"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M12 4 a8 8 0 0 0 0 16"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M12 4 C16 7 16 17 12 20",
+    fill: "none"
+  }), /*#__PURE__*/React.createElement("circle", {
+    cx: "12",
+    cy: "4",
+    r: "1.5",
+    fill: color,
+    stroke: "none"
+  }));
+  return /*#__PURE__*/React.createElement("svg", _extends({
+    width: size,
+    height: size,
+    viewBox: "0 0 24 24"
+  }, p), /*#__PURE__*/React.createElement("circle", {
+    cx: "12",
+    cy: "12",
+    r: "9"
+  }));
+}
+
+// ─── VESET VIEW ───────────────────────────────
+function VesetView({
+  warnings,
+  cycles,
+  setManualHaflagah
+}) {
+  const todayStr = today();
+  const [expanded, setExpanded] = useState({});
+  const typeInfo = {
+    beinonit: {
+      label: "עונה בינונית",
+      color: "var(--gold)",
+      bg: "var(--gold-bg)",
+      border: "#D4AE5A",
+      what: "יום 30 מתחילת הווסת האחרון — כל אישה חייבת לשמור יום זה בכל חודש, גם ללא וסת קבוע.",
+      prisha: w => w.onah === "day" ? "פרישה בעונת יום — מהנץ ועד השקיעה." : "פרישה בעונת לילה — משקיעה ועד הנץ.",
+      bedika: "בדיקה פנימית בסוף העונה שנשמרה, כדי לוודא שלא הופיע דם."
+    },
+    haflagah: {
+      label: "וסת ההפלגה",
+      color: "var(--blue)",
+      bg: "var(--blue-bg)",
+      border: "#6080D0",
+      what: "המרווח הזמן שחלף בין שני הווסתות האחרונים. אם אותו מרווח חוזר שלוש פעמים — נקבע ווסת קבוע.",
+      prisha: w => w.onah === "day" ? "פרישה בעונת יום — מהנץ ועד השקיעה." : "פרישה בעונת לילה — משקיעה ועד הנץ.",
+      bedika: "בדיקה פנימית בסוף העונה שנשמרה."
+    },
+    chodesh: {
+      label: "וסת החודש",
+      color: "var(--green)",
+      bg: "var(--green-bg)",
+      border: "#5A9B72",
+      what: "אותו יום בחודש העברי שבו הופיע הווסת בחודש שעבר. זהו קירוב גרגוריאני — לחישוב מדויק יש לבדוק לוח עברי.",
+      prisha: w => w.onah === "day" ? "פרישה בעונת יום — מהנץ ועד השקיעה." : "פרישה בעונת לילה — משקיעה ועד הנץ.",
+      bedika: "בדיקה פנימית בסוף העונה שנשמרה."
+    }
+  };
+  const upcoming = warnings.filter(w => w.date >= todayStr).slice(0, 8);
+  const past = warnings.filter(w => w.date < todayStr).reverse().slice(0, 5);
+  function toggle(key) {
+    setExpanded(e => ({
+      ...e,
+      [key]: !e[key]
+    }));
+  }
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "14px 16px"
+    },
+    className: "fade-in"
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      fontFamily: "'Secular One',sans-serif",
+      fontSize: 20,
+      fontWeight: 700,
+      color: "var(--primary)",
+      marginBottom: 3
+    }
+  }, /*#__PURE__*/React.createElement(AppIcon, {
+    name: "cycle",
+    color: "var(--primary-mid)",
+    size: 22
+  }), "\u05D5\u05E1\u05EA\u05D5\u05EA \u05E6\u05E4\u05D5\u05D9\u05D9\u05DD"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: "var(--text-light)"
+    }
+  }, "\u05D4\u05E2\u05E8\u05DB\u05D4 \u05D1\u05DC\u05D1\u05D3 \u2014 \u05D9\u05E9 \u05DC\u05D4\u05EA\u05D9\u05D9\u05E2\u05E5 \u05E2\u05DD \u05D9\u05D5\u05E2\u05E6\u05EA \u05D4\u05DC\u05DB\u05D4")), !cycles.length && /*#__PURE__*/React.createElement(Empty, {
+    icon: "\u25CC",
+    text: "\u05D0\u05D9\u05DF \u05DE\u05D7\u05D6\u05D5\u05E8\u05D9\u05DD \u05E2\u05D3\u05D9\u05D9\u05DF",
+    sub: "\u05D4\u05D5\u05E1\u05D9\u05E4\u05D9 \u05DE\u05D7\u05D6\u05D5\u05E8 \u05E8\u05D0\u05E9\u05D5\u05DF \u05DB\u05D3\u05D9 \u05DC\u05D7\u05E9\u05D1 \u05D5\u05E1\u05EA\u05D5\u05EA"
+  }), cycles.length === 1 && /*#__PURE__*/React.createElement(ManualHaflagah, {
+    lastBleedStart: cycles[0].bleedStart,
+    onah: cycles[0].onahStart || "day",
+    warnings: warnings,
+    setManualHaflagah: setManualHaflagah
+  }), upcoming.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      fontWeight: 700,
+      color: "var(--text-light)",
+      letterSpacing: 1,
+      textTransform: "uppercase",
+      marginBottom: 10
+    }
+  }, "\u05E7\u05E8\u05D5\u05D1\u05D9\u05DD"), upcoming.map((w, i) => {
+    const ti = typeInfo[w.type];
+    if (!ti) return null;
+    const isToday = w.date === todayStr;
+    const key = w.type + w.date;
+    const open = !!expanded[key];
+    return /*#__PURE__*/React.createElement("div", {
+      key: i,
+      className: "card",
+      style: {
+        marginBottom: 10,
+        overflow: "hidden",
+        border: `1px solid ${isToday ? "var(--red-mid)" : ti.border + "66"}`,
+        boxShadow: isToday ? "0 4px 24px rgba(139,40,40,0.18)" : "0 2px 12px var(--shadow)"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        height: 3,
+        background: `linear-gradient(90deg,${ti.color},${ti.border})`,
+        opacity: 0.8
+      }
+    }), /*#__PURE__*/React.createElement("div", {
+      style: {
+        padding: "12px 14px",
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        cursor: "pointer"
+      },
+      onClick: () => toggle(key)
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        width: 38,
+        height: 38,
+        borderRadius: 12,
+        background: isToday ? "var(--red-bg)" : ti.bg,
+        border: `1.5px solid ${isToday ? "var(--red-mid)" : ti.border}`,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        flexShrink: 0
+      }
+    }, /*#__PURE__*/React.createElement(VesetIcon, {
+      type: w.type,
+      color: isToday ? "var(--red-mid)" : ti.color,
+      size: 20
+    })), /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1,
+        minWidth: 0
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontWeight: 700,
+        fontSize: 14,
+        color: isToday ? "var(--red-mid)" : ti.color,
+        marginBottom: 1
+      }
+    }, ti.label), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: "var(--text-light)",
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        whiteSpace: "nowrap"
+      }
+    }, w.desc)), /*#__PURE__*/React.createElement("div", {
+      style: {
+        textAlign: "left",
+        flexShrink: 0
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontWeight: 700,
+        fontSize: 13,
+        color: isToday ? "var(--red-mid)" : ti.color
+      }
+    }, formatShort(w.date)), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 10,
+        color: isToday ? "var(--red-mid)" : "var(--text-light)",
+        fontWeight: isToday ? 700 : 400
+      }
+    }, isToday ? "היום!" : daysBetween(todayStr, w.date) + " י׳")), /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: "var(--text-light)",
+        fontSize: 11,
+        marginRight: 2,
+        transform: open ? "rotate(180deg)" : "none",
+        transition: "transform 0.2s",
+        display: "inline-block"
+      }
+    }, "\u25BC")), open && /*#__PURE__*/React.createElement("div", {
+      style: {
+        padding: "0 14px 14px"
+      },
+      className: "fade-in"
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: ti.bg,
+        borderRadius: 10,
+        padding: "10px 12px",
+        marginBottom: 8,
+        border: `1px solid ${ti.border}33`
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        fontWeight: 700,
+        color: ti.color,
+        marginBottom: 4
+      }
+    }, "\u05DE\u05D4\u05D5 \u05D4\u05D5\u05D5\u05E1\u05EA \u05D4\u05D6\u05D4?"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: "var(--text-mid)",
+        lineHeight: 1.7
+      }
+    }, ti.what)), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "grid",
+        gridTemplateColumns: "1fr 1fr",
+        gap: 8
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: "var(--card)",
+        borderRadius: 10,
+        padding: "10px",
+        border: "1px solid var(--border)"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 5,
+        marginBottom: 5
+      }
+    }, /*#__PURE__*/React.createElement("svg", {
+      width: "14",
+      height: "14",
+      viewBox: "0 0 24 24",
+      fill: "none",
+      stroke: "var(--primary-mid)",
+      strokeWidth: "2",
+      strokeLinecap: "round"
+    }, /*#__PURE__*/React.createElement("path", {
+      d: "M18 8 C18 4.7 15.3 2 12 2 C8.7 2 6 4.7 6 8 L5 22 h14z"
+    }), /*#__PURE__*/React.createElement("line", {
+      x1: "12",
+      y1: "10",
+      x2: "12",
+      y2: "16"
+    })), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 11,
+        fontWeight: 700,
+        color: "var(--primary-mid)"
+      }
+    }, "\u05E4\u05E8\u05D9\u05E9\u05D4")), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: "var(--text-mid)",
+        lineHeight: 1.6
+      }
+    }, typeof ti.prisha === "function" ? ti.prisha(w) : ti.prisha)), /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: "var(--card)",
+        borderRadius: 10,
+        padding: "10px",
+        border: "1px solid var(--border)"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 5,
+        marginBottom: 5
+      }
+    }, /*#__PURE__*/React.createElement("svg", {
+      width: "14",
+      height: "14",
+      viewBox: "0 0 24 24",
+      fill: "none",
+      stroke: "var(--green)",
+      strokeWidth: "2",
+      strokeLinecap: "round"
+    }, /*#__PURE__*/React.createElement("path", {
+      d: "M12 3 C12 3 5 10 5 15 a7 7 0 0 0 14 0 C19 10 12 3 12 3z"
+    }), /*#__PURE__*/React.createElement("line", {
+      x1: "12",
+      y1: "13",
+      x2: "12",
+      y2: "17"
+    })), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 11,
+        fontWeight: 700,
+        color: "var(--green)"
+      }
+    }, "\u05D1\u05D3\u05D9\u05E7\u05D4")), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: "var(--text-mid)",
+        lineHeight: 1.6
+      }
+    }, ti.bedika)))));
+  })), past.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 5,
+      fontSize: 11,
+      fontWeight: 700,
+      color: "var(--text-light)",
+      letterSpacing: 1,
+      textTransform: "uppercase",
+      marginBottom: 8,
+      marginTop: 6
+    }
+  }, /*#__PURE__*/React.createElement(AppIcon, {
+    name: "clock",
+    color: "var(--text-light)",
+    size: 12
+  }), "\u05E2\u05D1\u05E8\u05D5"), past.map((w, i) => {
+    const ti = typeInfo[w.type];
+    if (!ti) return null;
+    return /*#__PURE__*/React.createElement("div", {
+      key: i,
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        background: "var(--card)",
+        borderRadius: 12,
+        padding: "10px 14px",
+        marginBottom: 7,
+        border: "1px solid var(--border)",
+        opacity: 0.65
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        width: 30,
+        height: 30,
+        borderRadius: 9,
+        background: ti.bg,
+        border: `1px solid ${ti.border}44`,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        flexShrink: 0
+      }
+    }, /*#__PURE__*/React.createElement(VesetIcon, {
+      type: w.type,
+      color: ti.color,
+      size: 16
+    })), /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontWeight: 600,
+        fontSize: 12,
+        color: "var(--text-mid)"
+      }
+    }, ti.label), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 10,
+        color: "var(--text-light)"
+      }
+    }, w.desc)), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: "var(--text-light)",
+        fontFamily: "'Secular One',sans-serif"
+      }
+    }, formatShort(w.date)));
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "linear-gradient(135deg,var(--gold-bg),#FEF3D0)",
+      borderRadius: 14,
+      padding: "14px",
+      marginTop: 10,
+      border: "1px solid #D4AE5A66"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      alignItems: "flex-start"
+    }
+  }, /*#__PURE__*/React.createElement("svg", {
+    width: "18",
+    height: "18",
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "var(--gold)",
+    strokeWidth: "2",
+    strokeLinecap: "round",
+    flexShrink: "0",
+    style: {
+      flexShrink: 0,
+      marginTop: 1
+    }
+  }, /*#__PURE__*/React.createElement("circle", {
+    cx: "12",
+    cy: "12",
+    r: "9"
+  }), /*#__PURE__*/React.createElement("line", {
+    x1: "12",
+    y1: "8",
+    x2: "12",
+    y2: "12"
+  }), /*#__PURE__*/React.createElement("circle", {
+    cx: "12",
+    cy: "16",
+    r: "0.5",
+    fill: "var(--gold)"
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "var(--text-mid)",
+      lineHeight: 1.8
+    }
+  }, "\u05D4\u05D7\u05D9\u05E9\u05D5\u05D1\u05D9\u05DD \u05D4\u05DD ", /*#__PURE__*/React.createElement("strong", null, "\u05DB\u05DC\u05D9 \u05E2\u05D6\u05E8 \u05D1\u05DC\u05D1\u05D3"), " \u05D5\u05D0\u05D9\u05E0\u05DD \u05DE\u05D7\u05DC\u05D9\u05E4\u05D9\u05DD \u05E4\u05E1\u05D9\u05E7\u05EA \u05D4\u05DC\u05DB\u05D4. \u05DC\u05D7\u05D9\u05E9\u05D5\u05D1 \u05DE\u05D3\u05D5\u05D9\u05E7 \u05E9\u05DC \u05D5\u05E1\u05EA \u05D4\u05D7\u05D5\u05D3\u05E9 \u05DC\u05E4\u05D9 \u05DC\u05D5\u05D7 \u05E2\u05D1\u05E8\u05D9 \u05D5\u05DC\u05E9\u05D0\u05DC\u05EA \"\u05D4\u05D0\u05DD \u05D4\u05D5\u05D5\u05E1\u05EA \u05E0\u05E7\u05D1\u05E2\" \u2014 \u05D9\u05E9 \u05DC\u05D4\u05EA\u05D9\u05D9\u05E2\u05E5 \u05E2\u05DD \u05D9\u05D5\u05E2\u05E6\u05EA \u05D4\u05DC\u05DB\u05D4 \u05DE\u05D5\u05E1\u05DE\u05DB\u05EA."))));
+}
+
+// ─── SETTINGS VIEW ───────────────────────────
+function SettingsView({
+  settings,
+  setSettings,
+  exportData,
+  importData,
+  setPinUnlocked,
+  cycles,
+  refreshSunTimes
+}) {
+  const [pinSetup, setPinSetup] = useState(false);
+  const [newPin, setNewPin] = useState("");
+  const [confirmPin, setConfirmPin] = useState("");
+  const [pinError, setPinError] = useState("");
+  const importRef = useRef();
+  function upd(key, val) {
+    setSettings(s => ({
+      ...s,
+      [key]: val
+    }));
+  }
+  function savePin() {
+    if (newPin.length !== 4 || !/^\d+$/.test(newPin)) {
+      setPinError("יש להזין 4 ספרות בדיוק");
+      return;
+    }
+    if (newPin !== confirmPin) {
+      setPinError("הקודים אינם תואמים");
+      return;
+    }
+    setSettings(s => ({
+      ...s,
+      pin: newPin,
+      pinEnabled: true
+    }));
+    setPinSetup(false);
+    setNewPin("");
+    setConfirmPin("");
+    setPinError("");
+  }
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "14px 16px"
+    },
+    className: "fade-in"
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      fontFamily: "'Secular One',sans-serif",
+      fontSize: 19,
+      fontWeight: 700,
+      color: "var(--primary)",
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement(AppIcon, {
+    name: "cycle",
+    color: "var(--primary-mid)",
+    size: 22
+  }), "\u05D4\u05D2\u05D3\u05E8\u05D5\u05EA"), /*#__PURE__*/React.createElement(Section, {
+    title: /*#__PURE__*/React.createElement("span", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 6
+      }
+    }, /*#__PURE__*/React.createElement(AppIcon, {
+      name: "sunrise",
+      color: "var(--gold)",
+      size: 14
+    }), "\u05D6\u05DE\u05E0\u05D9 \u05D4\u05D9\u05D5\u05DD")
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 10
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 5,
+      fontSize: 12,
+      color: "var(--text-mid)",
+      marginBottom: 5,
+      fontWeight: 500
+    }
+  }, /*#__PURE__*/React.createElement(AppIcon, {
+    name: "city",
+    color: "var(--gold)",
+    size: 13
+  }), "\u05E2\u05D9\u05E8 / \u05DE\u05D9\u05E7\u05D5\u05DD"), /*#__PURE__*/React.createElement("select", {
+    value: settings.city,
+    onChange: e => refreshSunTimes(e.target.value, settings),
+    style: {
+      width: "100%",
+      padding: "10px 12px",
+      borderRadius: "var(--radius-sm)",
+      border: "1.5px solid var(--border)",
+      background: "var(--bg)",
+      fontSize: 14,
+      outline: "none",
+      color: "var(--text)"
+    }
+  }, Object.keys(CITIES).map(c => /*#__PURE__*/React.createElement("option", {
+    key: c,
+    value: c
+  }, c)))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "grid",
+      gridTemplateColumns: "1fr 1fr",
+      gap: 10
+    }
+  }, [["netz", "sunrise", "הנץ"], ["shkia", "sunset", "שקיעה"]].map(([field, iconName, label]) => /*#__PURE__*/React.createElement("div", {
+    key: field,
+    style: {
+      background: "var(--bg)",
+      borderRadius: 10,
+      padding: "10px",
+      border: "1px solid var(--border)",
+      textAlign: "center"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 4,
+      fontSize: 11,
+      color: "var(--text-light)",
+      marginBottom: 3
+    }
+  }, /*#__PURE__*/React.createElement(AppIcon, {
+    name: iconName,
+    color: "var(--text-light)",
+    size: 12
+  }), label), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 700,
+      fontSize: 20,
+      color: "var(--primary)",
+      fontFamily: "'Secular One',sans-serif"
+    }
+  }, settings[field])))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "var(--text-light)",
+      marginTop: 8,
+      background: "var(--green-bg)",
+      borderRadius: 8,
+      padding: "7px 10px",
+      border: "1px solid rgba(58,107,80,0.2)"
+    }
+  }, "\u05D4\u05D6\u05DE\u05E0\u05D9\u05DD \u05DE\u05D7\u05D5\u05E9\u05D1\u05D9\u05DD \u05D0\u05D5\u05D8\u05D5\u05DE\u05D8\u05D9\u05EA \u05DC\u05E4\u05D9 \u05EA\u05D0\u05E8\u05D9\u05DA \u05D4\u05D9\u05D5\u05DD \u05D5\u05DE\u05D9\u05E7\u05D5\u05DD \u05D4\u05E2\u05D9\u05E8")), /*#__PURE__*/React.createElement(Section, {
+    title: /*#__PURE__*/React.createElement("span", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 6
+      }
+    }, /*#__PURE__*/React.createElement(AppIcon, {
+      name: "bell",
+      color: "var(--primary-mid)",
+      size: 14
+    }), "\u05EA\u05D6\u05DB\u05D5\u05E8\u05D5\u05EA")
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "grid",
+      gridTemplateColumns: "1fr 1fr",
+      gap: 10,
+      marginBottom: 10
+    }
+  }, [["morningReminder", "sunrise", "בדיקת בוקר"], ["eveningReminder", "sunset", "בדיקה לפני השקיעה"]].map(([field, iconName, label]) => /*#__PURE__*/React.createElement("div", {
+    key: field
+  }, /*#__PURE__*/React.createElement("label", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 5,
+      fontSize: 12,
+      color: "var(--text-mid)",
+      marginBottom: 5,
+      fontWeight: 500
+    }
+  }, /*#__PURE__*/React.createElement(AppIcon, {
+    name: iconName,
+    color: "var(--gold)",
+    size: 13
+  }), label), /*#__PURE__*/React.createElement("input", {
+    type: "time",
+    value: settings[field],
+    onChange: e => upd(field, e.target.value),
+    style: {
+      width: "100%",
+      padding: "9px 10px",
+      borderRadius: 9,
+      border: "1.5px solid var(--border)",
+      background: "var(--bg)",
+      fontSize: 15,
+      outline: "none",
+      direction: "ltr",
+      color: "var(--text)"
+    }
+  })))), /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      if (!("Notification" in window)) {
+        alert("הדפדפן אינו תומך");
+        return;
+      }
+      Notification.requestPermission().then(p => {
+        if (p === "granted") upd("remindersEnabled", true);
+      });
+    },
+    style: {
+      width: "100%",
+      padding: "10px",
+      borderRadius: 10,
+      border: `2px solid ${settings.remindersEnabled ? "#7eb89a" : "#d4c5b0"}`,
+      background: settings.remindersEnabled ? "#e8f5ee" : "#fdf6ef",
+      color: settings.remindersEnabled ? "#3a8060" : "#7a5c44",
+      fontWeight: 600,
+      fontSize: 13,
+      cursor: "pointer"
+    }
+  }, settings.remindersEnabled ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(AppIcon, {
+    name: "check-circle",
+    color: "var(--green)",
+    size: 15
+  }), " \u05EA\u05D6\u05DB\u05D5\u05E8\u05D5\u05EA \u05D1\u05D3\u05D9\u05E7\u05D5\u05EA \u05E4\u05E2\u05D9\u05DC\u05D5\u05EA") : "הפעלת תזכורות בדיקות")), /*#__PURE__*/React.createElement(Section, {
+    title: /*#__PURE__*/React.createElement("span", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 6
+      }
+    }, /*#__PURE__*/React.createElement(AppIcon, {
+      name: "cycle",
+      color: "var(--primary-mid)",
+      size: 14
+    }), "\u05EA\u05D6\u05DB\u05D5\u05E8\u05D5\u05EA \u05D5\u05E1\u05EA\u05D5\u05EA")
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: "var(--text-mid)",
+      marginBottom: 10,
+      lineHeight: 1.7
+    }
+  }, "\u05E7\u05D1\u05DC\u05D9 \u05EA\u05D6\u05DB\u05D5\u05E8\u05EA \u05D1\u05D9\u05D5\u05DD \u05D4\u05E6\u05E4\u05D5\u05D9 \u05E9\u05DC \u05DB\u05DC \u05D5\u05E1\u05EA \u2014 \u05E2\u05D5\u05E0\u05D4 \u05D1\u05D9\u05E0\u05D5\u05E0\u05D9\u05EA, \u05D4\u05E4\u05DC\u05D2\u05D4 \u05D5\u05D5\u05E1\u05EA \u05D4\u05D7\u05D5\u05D3\u05E9."), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 10
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 5,
+      fontSize: 12,
+      color: "var(--text-mid)",
+      marginBottom: 5,
+      fontWeight: 500
+    }
+  }, /*#__PURE__*/React.createElement(AppIcon, {
+    name: "clock",
+    color: "var(--gold)",
+    size: 13
+  }), "\u05E9\u05E2\u05EA \u05EA\u05D6\u05DB\u05D5\u05E8\u05EA"), /*#__PURE__*/React.createElement("input", {
+    type: "time",
+    value: settings.vesetReminder || "08:00",
+    onChange: e => upd("vesetReminder", e.target.value),
+    style: {
+      width: "100%",
+      padding: "9px 10px",
+      borderRadius: 9,
+      border: "1.5px solid var(--border)",
+      background: "var(--bg)",
+      fontSize: 15,
+      outline: "none",
+      direction: "ltr",
+      color: "var(--text)"
+    }
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "var(--gold-bg)",
+      borderRadius: 10,
+      padding: "10px 12px",
+      marginBottom: 10,
+      border: "1px solid #D4AE5A44"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "var(--text-mid)",
+      lineHeight: 1.8
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 6,
+      marginBottom: 3
+    }
+  }, /*#__PURE__*/React.createElement(AppIcon, {
+    name: "clock",
+    color: "var(--gold)",
+    size: 12
+  }), "\u05E2\u05D5\u05E0\u05D4 \u05D1\u05D9\u05E0\u05D5\u05E0\u05D9\u05EA \u2014 \u05D9\u05D5\u05DD 30 \u05DE\u05D4\u05D5\u05D5\u05E1\u05EA"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 6,
+      marginBottom: 3
+    }
+  }, /*#__PURE__*/React.createElement(AppIcon, {
+    name: "cycle",
+    color: "var(--gold)",
+    size: 12
+  }), "\u05D5\u05E1\u05EA \u05D4\u05D4\u05E4\u05DC\u05D2\u05D4 \u2014 \u05D7\u05D6\u05E8\u05EA \u05D4\u05DE\u05E8\u05D5\u05D5\u05D7"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 6
+    }
+  }, /*#__PURE__*/React.createElement(VesetIcon, {
+    type: "chodesh",
+    color: "var(--gold)",
+    size: 12
+  }), "\u05D5\u05E1\u05EA \u05D4\u05D7\u05D5\u05D3\u05E9 \u2014 \u05D0\u05D5\u05EA\u05D5 \u05D9\u05D5\u05DD \u05E2\u05D1\u05E8\u05D9"))), /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      if (!("Notification" in window)) {
+        alert("הדפדפן אינו תומך");
+        return;
+      }
+      Notification.requestPermission().then(p => {
+        if (p === "granted") upd("vesetRemindersEnabled", true);
+      });
+    },
+    style: {
+      width: "100%",
+      padding: "10px",
+      borderRadius: 10,
+      border: `2px solid ${settings.vesetRemindersEnabled ? "var(--gold)" : "var(--border)"}`,
+      background: settings.vesetRemindersEnabled ? "var(--gold-bg)" : "var(--bg)",
+      color: settings.vesetRemindersEnabled ? "var(--gold)" : "var(--text-mid)",
+      fontWeight: 600,
+      fontSize: 13,
+      cursor: "pointer"
+    }
+  }, settings.vesetRemindersEnabled ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(AppIcon, {
+    name: "check-circle",
+    color: "var(--gold)",
+    size: 15
+  }), " \u05EA\u05D6\u05DB\u05D5\u05E8\u05D5\u05EA \u05D5\u05E1\u05EA\u05D5\u05EA \u05E4\u05E2\u05D9\u05DC\u05D5\u05EA") : "הפעלת תזכורות וסתות")), /*#__PURE__*/React.createElement(Section, {
+    title: /*#__PURE__*/React.createElement("span", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 6
+      }
+    }, /*#__PURE__*/React.createElement(AppIcon, {
+      name: "lock",
+      color: "var(--primary-mid)",
+      size: 14
+    }), "\u05E0\u05E2\u05D9\u05DC\u05EA \u05D0\u05E4\u05DC\u05D9\u05E7\u05E6\u05D9\u05D4")
+  }, settings.pinEnabled ? /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#e8f5ee",
+      borderRadius: 9,
+      padding: "10px 12px",
+      marginBottom: 10,
+      fontSize: 13,
+      color: "#3a8060",
+      fontWeight: 500
+    }
+  }, "\u2705 \u05E0\u05E2\u05D9\u05DC\u05D4 \u05D1\u05E7\u05D5\u05D3 PIN \u05E4\u05E2\u05D9\u05DC\u05D4"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => setPinSetup(true),
+    style: {
+      flex: 1,
+      padding: "9px",
+      borderRadius: 9,
+      border: "2px solid #d4c5b0",
+      background: "#fdf6ef",
+      color: "#6b3f22",
+      fontWeight: 600,
+      fontSize: 13,
+      cursor: "pointer"
+    }
+  }, "\u05E9\u05E0\u05D4 \u05E7\u05D5\u05D3"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      setSettings(s => ({
+        ...s,
+        pinEnabled: false,
+        pin: ""
+      }));
+      setPinUnlocked(false);
+    },
+    style: {
+      flex: 1,
+      padding: "9px",
+      borderRadius: 9,
+      border: "2px solid #f0c0c0",
+      background: "#fff5f5",
+      color: "#c04040",
+      fontWeight: 600,
+      fontSize: 13,
+      cursor: "pointer"
+    }
+  }, "\u05D1\u05D8\u05DC \u05E0\u05E2\u05D9\u05DC\u05D4"))) : /*#__PURE__*/React.createElement("button", {
+    onClick: () => setPinSetup(true),
+    style: {
+      width: "100%",
+      padding: "10px",
+      borderRadius: 10,
+      border: "2px solid #d4c5b0",
+      background: "#fdf6ef",
+      color: "#6b3f22",
+      fontWeight: 600,
+      fontSize: 14,
+      cursor: "pointer"
+    }
+  }, "\u05D4\u05D2\u05D3\u05E8\u05EA \u05E7\u05D5\u05D3 \u05D2\u05D9\u05E9\u05D4 4 \u05E1\u05E4\u05E8\u05D5\u05EA"), pinSetup && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 12,
+      background: "#fdf6ef",
+      borderRadius: 11,
+      padding: "12px",
+      border: "1px solid #d4c5b0"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13,
+      color: "#6b3f22",
+      fontWeight: 600,
+      marginBottom: 8
+    }
+  }, "\u05D4\u05D2\u05D3\u05E8\u05EA \u05E7\u05D5\u05D3 \u05D7\u05D3\u05E9"), [["קוד חדש (4 ספרות):", newPin, setNewPin], ["אימות קוד:", confirmPin, setConfirmPin]].map(([lbl, val, fn]) => /*#__PURE__*/React.createElement("div", {
+    key: lbl,
+    style: {
+      marginBottom: 9
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: {
+      display: "block",
+      fontSize: 12,
+      color: "#7a5c44",
+      marginBottom: 4
+    }
+  }, lbl), /*#__PURE__*/React.createElement("input", {
+    type: "password",
+    inputMode: "numeric",
+    maxLength: 4,
+    value: val,
+    onChange: e => fn(e.target.value.replace(/\D/g, "")),
+    style: {
+      width: "100%",
+      padding: "9px 12px",
+      borderRadius: 9,
+      border: "2px solid #d4c5b0",
+      background: "white",
+      fontSize: 18,
+      letterSpacing: 8,
+      outline: "none",
+      direction: "ltr"
+    }
+  }))), pinError && /*#__PURE__*/React.createElement("div", {
+    style: {
+      color: "#c04040",
+      fontSize: 12,
+      marginBottom: 8
+    }
+  }, pinError), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: savePin,
+    style: {
+      flex: 1,
+      padding: "9px",
+      borderRadius: 9,
+      background: "linear-gradient(135deg,#7eb89a,#5a9878)",
+      color: "white",
+      border: "none",
+      fontWeight: 700,
+      fontSize: 13,
+      cursor: "pointer"
+    }
+  }, "\u05E9\u05DE\u05D5\u05E8 \u05E7\u05D5\u05D3"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      setPinSetup(false);
+      setNewPin("");
+      setConfirmPin("");
+      setPinError("");
+    },
+    style: {
+      padding: "9px 14px",
+      borderRadius: 9,
+      background: "#f0e4d4",
+      color: "#8a6040",
+      border: "none",
+      fontSize: 13,
+      cursor: "pointer"
+    }
+  }, "\u05D1\u05D9\u05D8\u05D5\u05DC")))));
+}
+function Section({
+  title,
+  children
+}) {
+  return /*#__PURE__*/React.createElement("div", {
+    className: "card",
+    style: {
+      padding: "16px",
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 700,
+      fontSize: 13,
+      color: "var(--primary-mid)",
+      marginBottom: 12,
+      display: "flex",
+      alignItems: "center",
+      gap: 6
+    }
+  }, title), children);
+}
+function Empty({
+  icon,
+  text,
+  sub
+}) {
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      textAlign: "center",
+      padding: "70px 24px",
+      color: "var(--text-light)"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 48,
+      marginBottom: 14,
+      filter: "drop-shadow(0 4px 8px rgba(0,0,0,0.1))",
+      opacity: 0.5
+    }
+  }, icon), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: "'Secular One',sans-serif",
+      fontWeight: 700,
+      fontSize: 17,
+      color: "var(--text-mid)",
+      marginBottom: 6
+    }
+  }, text), sub && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: "var(--text-light)",
+      lineHeight: 1.6
+    }
+  }, sub));
+}
+window.App=App;
+})();
+</script>
+
+<script>
+// Firebase init
+firebase.initializeApp({
+  apiKey: "AIzaSyDzaUw71bmmFOjsbxIVhGv0tfKimguZV9E",
+  authDomain: "tahara-tracker-64477.firebaseapp.com",
+  projectId: "tahara-tracker-64477",
+  storageBucket: "tahara-tracker-64477.firebasestorage.app",
+  messagingSenderId: "93082261544",
+  appId: "1:93082261544:web:dc9023266948c009eb7d1d"
+});
+const auth = firebase.auth();
+const db   = firebase.firestore();
+const STORAGE_KEY = 'tahara-v3';
+let uid = null;
+let appMounted = false;
+
+function userDoc() { return db.collection('users').doc(uid).collection('data').doc('main'); }
+
+// Sync localStorage → Firestore on every write
+const _origSet = Storage.prototype.setItem.bind(localStorage);
+Storage.prototype.setItem = function(key, val) {
+  _origSet(key, val);
+  if (key === STORAGE_KEY && uid) {
+    try { userDoc().set(JSON.parse(val)); } catch(e) {}
+  }
+};
+
+function setStatus(msg, spin) {
+  document.getElementById('status-area').innerHTML = spin
+    ? `<div style="display:flex;flex-direction:column;align-items:center;gap:8px"><div class="spinner"></div><div class="status-txt">${msg}</div></div>`
+    : `<div class="status-txt">${msg}</div>`;
+}
+
+function doLogin() {
+  setStatus('פותחת חלון כניסה...', false);
+  const provider = new firebase.auth.GoogleAuthProvider();
+  auth.signInWithPopup(provider).catch(err => {
+    setStatus('שגיאת כניסה — נסי שנית', false);
+    console.error('Login error:', err.code, err.message);
+  });
+}
+
+auth.onAuthStateChanged(async (user) => {
+  if (user && !appMounted) {
+    appMounted = true;
+    uid = user.uid;
+    setStatus('טוענת נתונים...', true);
+    try {
+      const doc = await userDoc().get();
+      if (doc.exists) {
+        _origSet(STORAGE_KEY, JSON.stringify(doc.data()));
+      }
+    } catch(e) { console.warn('Firestore load error:', e); }
+    // Mount React app (App is already defined — no Babel needed)
+    document.getElementById('login-screen').style.display = 'none';
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(React.createElement(window.App));
+  }
+});
+</script>
+
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(()=>{});
+  });
+}
+
+// ── OneSignal init ────────────────────────────
+window.OneSignalDeferred = window.OneSignalDeferred || [];
+OneSignalDeferred.push(async function(OneSignal) {
+  await OneSignal.init({
+    appId: "569868ca-1c94-4b39-a57b-1aa8ffdd3afb",
+    safari_web_id: "web.onesignal.auto.20cc36d3-e742-47b9-8fc8-37c27a32926f",
+    notifyButton: { enable: false }, // we handle our own UI
+    welcomeNotification: { disable: true },
+  });
+
+  // ── Smart daily reminder check ────────────────
+  // Runs when user opens the app — checks if a reminder is due today
+  function checkTodayReminders() {
+    try {
+      const raw = localStorage.getItem('tahara-v3');
+      if (!raw) return;
+      const { settings, cycles } = JSON.parse(raw);
+      if (!settings) return;
+
+      const now = new Date();
+      const todayStr = now.toISOString().split('T')[0];
+      const hhmm = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
+
+      // Check if we already notified today
+      const lastCheck = localStorage.getItem('os_last_check');
+      if (lastCheck === todayStr) return;
+      localStorage.setItem('os_last_check', todayStr);
+
+      const msgs = [];
+
+      // Veset warning today?
+      if (settings.vesetRemindersEnabled && cycles?.length) {
+        const last = cycles[cycles.length-1];
+        const onah = last.onahStart || 'day';
+        const onahLabel = onah === 'day' ? 'עונת יום' : 'עונת לילה';
+        // Beinonit = day 30
+        function addDays(d,n){const x=new Date(d);x.setDate(x.getDate()+n);return x.toISOString().split('T')[0];}
+        const beinonit = addDays(last.bleedStart, 29);
+        if (beinonit === todayStr) msgs.push(`⏰ עונה בינונית היום — ${onahLabel}`);
+        // Haflagah
+        if (cycles.length >= 2) {
+          const prev = cycles[cycles.length-2];
+          const interval = Math.round((new Date(last.bleedStart)-new Date(prev.bleedStart))/86400000);
+          const haflagah = addDays(last.bleedStart, interval);
+          if (haflagah === todayStr) msgs.push(`⏰ וסת הפלגה היום — ${onahLabel}`);
+        }
+      }
+
+      // Send notifications via OneSignal
+      msgs.forEach((msg, i) => {
+        setTimeout(() => {
+          OneSignal.User.PushSubscription.optIn().then(() => {
+            // Use OneSignal API to send to self
+            fetch('https://onesignal.com/api/v1/notifications', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                app_id: '569868ca-1c94-4b39-a57b-1aa8ffdd3afb',
+                include_aliases: { external_id: [OneSignal.User.externalId || 'self'] },
+                target_channel: 'push',
+                headings: { he: 'ביתילי', en: 'ביתילי' },
+                contents: { he: msg, en: msg },
+              })
+            }).catch(()=>{
+              // Fallback: browser notification
+              if (Notification.permission === 'granted') {
+                new Notification('ביתילי', { body: msg, icon: '/icon-192.png', dir: 'rtl' });
+              }
+            });
+          });
+        }, i * 2000);
+      });
+
+      // Morning/evening reminder via browser Notification
+      if (settings.remindersEnabled) {
+        if (Notification.permission !== 'granted') {
+          Notification.requestPermission();
+        }
+        // Schedule morning reminder
+        function scheduleNotif(timeStr, title, body) {
+          const [h, m] = timeStr.split(':').map(Number);
+          const target = new Date();
+          target.setHours(h, m, 0, 0);
+          const delay = target - now;
+          if (delay > 0 && delay < 86400000) {
+            setTimeout(() => {
+              if (Notification.permission === 'granted') {
+                new Notification(title, { body, icon: '/icon-192.png', dir: 'rtl' });
+              }
+            }, delay);
+          }
+        }
+        scheduleNotif(
+          settings.morningReminder || '07:00',
+          'ביתילי — בדיקת בוקר',
+          `זמן לבדיקת בוקר לאחר ${settings.netz || '06:15'} (הנץ)`
+        );
+        scheduleNotif(
+          settings.eveningReminder || '19:00',
+          'ביתילי — בדיקה לפני השקיעה',
+          `זמן לבדיקה לפני השקיעה (${settings.shkia || '19:09'})`
+        );
+      }
+    } catch(e) { console.warn('reminder check:', e); }
+  }
+
+  // Request permission + check reminders when app opens
+  await OneSignal.User.PushSubscription.optIn();
+  setTimeout(checkTodayReminders, 2000);
+});
+setInterval(() => {
+  if (navigator.serviceWorker?.controller) {
+    try {
+      const raw = localStorage.getItem('tahara-v3');
+      const settings = raw ? JSON.parse(raw).settings : null;
+      navigator.serviceWorker.controller.postMessage({type:'SCHEDULE_CHECK', settings});
+    } catch(e) {}
+  }
+}, 60000);
+</script>
+</body>
+</html>
