@@ -1,13 +1,9 @@
 [build]
   publish = "."
 
-[[plugins]]
-  package = "@netlify/plugin-functions-install-core"
-
 [functions]
   directory = "netlify/functions"
 
-# Run send-reminders every hour
 [[scheduled-functions]]
   name = "send-reminders"
-  cron = "0 * * * *"
+  cron = "*/15 * * * *"

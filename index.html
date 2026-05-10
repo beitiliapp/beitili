@@ -10,31 +10,21 @@
 <title>ביתילי</title>
 <link rel="manifest" href="manifest.json"/>
 <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;600;700;800&family=Secular+One&family=Suez+One&display=swap" rel="stylesheet"/>
+<script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
 <style>
 html,body{margin:0;padding:0;background:#3D1A2E;}
 #root{min-height:100vh;background:#FAF5EE;}
-#login-screen{
-  position:fixed;inset:0;z-index:999;
-  background:linear-gradient(135deg,#3D1A2E 0%,#6B2D4A 100%);
-  display:flex;flex-direction:column;align-items:center;justify-content:center;
-  gap:28px;font-family:Rubik,sans-serif;
-}
+#login-screen{position:fixed;inset:0;z-index:999;background:linear-gradient(135deg,#3D1A2E 0%,#6B2D4A 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:28px;font-family:Rubik,sans-serif;}
 .login-title{font-family:"Secular One",sans-serif;font-size:40px;color:white;letter-spacing:2px;}
 .login-sub{font-size:13px;color:#D4AE5A;}
-.google-btn{
-  display:flex;align-items:center;gap:12px;background:white;color:#3D1A2E;
-  border:none;border-radius:30px;padding:15px 32px;font-size:15px;font-weight:700;
-  cursor:pointer;box-shadow:0 6px 24px rgba(0,0,0,0.4);font-family:Rubik,sans-serif;
-}
+.google-btn{display:flex;align-items:center;gap:12px;background:white;color:#3D1A2E;border:none;border-radius:30px;padding:15px 32px;font-size:15px;font-weight:700;cursor:pointer;box-shadow:0 6px 24px rgba(0,0,0,0.4);font-family:Rubik,sans-serif;}
 .login-note{font-size:11px;color:rgba(255,255,255,0.4);text-align:center;line-height:1.9;}
 .spinner{width:34px;height:34px;border:3px solid rgba(212,174,90,0.2);border-top-color:#D4AE5A;border-radius:50%;animation:spin 0.7s linear infinite;}
 @keyframes spin{to{transform:rotate(360deg);}}
 .status-txt{color:#D4AE5A;font-size:12px;}
 </style>
-<script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
 </head>
 <body>
-
 <div id="login-screen">
   <div class="login-title">ביתילי</div>
   <div class="login-sub">מעקב טהרה אישי ומאובטח</div>
@@ -52,19 +42,15 @@ html,body{margin:0;padding:0;background:#3D1A2E;}
   <div id="status-area"></div>
   <div class="login-note">הנתונים שלך מאובטחים<br/>ומגובים בחשבון Google האישי שלך</div>
 </div>
-
 <div id="root"></div>
 
-<!-- React (no Babel needed — pre-compiled) -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
-
-<!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 
-<!-- Pre-compiled app (no Babel needed) -->
+<!-- Pre-compiled app -->
 <script>
 (function(){
 const {useState,useEffect,useRef}=React;
@@ -5776,7 +5762,6 @@ window.App=App;
 </script>
 
 <script>
-// Firebase init
 firebase.initializeApp({
   apiKey: "AIzaSyABRaV3BRf1JjYc-CSVyxhOT1pFDuiogl8",
   authDomain: "beitili-c120c.firebaseapp.com",
@@ -5788,12 +5773,10 @@ firebase.initializeApp({
 const auth = firebase.auth();
 const db   = firebase.firestore();
 const STORAGE_KEY = 'tahara-v3';
-let uid = null;
-let appMounted = false;
+let uid = null, appMounted = false;
 
 function userDoc() { return db.collection('users').doc(uid).collection('data').doc('main'); }
 
-// Sync localStorage → Firestore on every write
 const _origSet = Storage.prototype.setItem.bind(localStorage);
 Storage.prototype.setItem = function(key, val) {
   _origSet(key, val);
@@ -5810,10 +5793,9 @@ function setStatus(msg, spin) {
 
 function doLogin() {
   setStatus('פותחת חלון כניסה...', false);
-  const provider = new firebase.auth.GoogleAuthProvider();
-  auth.signInWithPopup(provider).catch(err => {
+  auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(err => {
     setStatus('שגיאת כניסה — נסי שנית', false);
-    console.error('Login error:', err.code, err.message);
+    console.error('Login:', err.code, err.message);
   });
 }
 
@@ -5824,144 +5806,67 @@ auth.onAuthStateChanged(async (user) => {
     setStatus('טוענת נתונים...', true);
     try {
       const doc = await userDoc().get();
-      if (doc.exists) {
-        _origSet(STORAGE_KEY, JSON.stringify(doc.data()));
-      }
-    } catch(e) { console.warn('Firestore load error:', e); }
-    // Mount React app (App is already defined — no Babel needed)
+      if (doc.exists) _origSet(STORAGE_KEY, JSON.stringify(doc.data()));
+    } catch(e) { console.warn('load:', e); }
+
+    // Tag OneSignal with UID for per-user notifications
+    if (window.OneSignalDeferred) {
+      window.OneSignalDeferred.push(function(OneSignal) {
+        OneSignal.login(user.uid).catch(()=>{});
+        OneSignal.User.addTag("uid", user.uid);
+      });
+    }
+
     document.getElementById('login-screen').style.display = 'none';
     const root = ReactDOM.createRoot(document.getElementById('root'));
     root.render(React.createElement(window.App));
   }
 });
-</script>
 
-<script>
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch(()=>{});
-  });
-}
-
-// ── OneSignal init ────────────────────────────
+// OneSignal init
 window.OneSignalDeferred = window.OneSignalDeferred || [];
 OneSignalDeferred.push(async function(OneSignal) {
   await OneSignal.init({
     appId: "569868ca-1c94-4b39-a57b-1aa8ffdd3afb",
     safari_web_id: "web.onesignal.auto.20cc36d3-e742-47b9-8fc8-37c27a32926f",
-    notifyButton: { enable: false }, // we handle our own UI
+    notifyButton: { enable: false },
     welcomeNotification: { disable: true },
   });
-
-  // ── Smart daily reminder check ────────────────
-  // Runs when user opens the app — checks if a reminder is due today
-  function checkTodayReminders() {
-    try {
-      const raw = localStorage.getItem('tahara-v3');
-      if (!raw) return;
-      const { settings, cycles } = JSON.parse(raw);
-      if (!settings) return;
-
-      const now = new Date();
-      const todayStr = now.toISOString().split('T')[0];
-      const hhmm = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
-
-      // Check if we already notified today
-      const lastCheck = localStorage.getItem('os_last_check');
-      if (lastCheck === todayStr) return;
-      localStorage.setItem('os_last_check', todayStr);
-
-      const msgs = [];
-
-      // Veset warning today?
-      if (settings.vesetRemindersEnabled && cycles?.length) {
-        const last = cycles[cycles.length-1];
-        const onah = last.onahStart || 'day';
-        const onahLabel = onah === 'day' ? 'עונת יום' : 'עונת לילה';
-        // Beinonit = day 30
-        function addDays(d,n){const x=new Date(d);x.setDate(x.getDate()+n);return x.toISOString().split('T')[0];}
-        const beinonit = addDays(last.bleedStart, 29);
-        if (beinonit === todayStr) msgs.push(`⏰ עונה בינונית היום — ${onahLabel}`);
-        // Haflagah
-        if (cycles.length >= 2) {
-          const prev = cycles[cycles.length-2];
-          const interval = Math.round((new Date(last.bleedStart)-new Date(prev.bleedStart))/86400000);
-          const haflagah = addDays(last.bleedStart, interval);
-          if (haflagah === todayStr) msgs.push(`⏰ וסת הפלגה היום — ${onahLabel}`);
-        }
-      }
-
-      // Send notifications via OneSignal
-      msgs.forEach((msg, i) => {
-        setTimeout(() => {
-          OneSignal.User.PushSubscription.optIn().then(() => {
-            // Use OneSignal API to send to self
-            fetch('https://onesignal.com/api/v1/notifications', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                app_id: '569868ca-1c94-4b39-a57b-1aa8ffdd3afb',
-                include_aliases: { external_id: [OneSignal.User.externalId || 'self'] },
-                target_channel: 'push',
-                headings: { he: 'ביתילי', en: 'ביתילי' },
-                contents: { he: msg, en: msg },
-              })
-            }).catch(()=>{
-              // Fallback: browser notification
-              if (Notification.permission === 'granted') {
-                new Notification('ביתילי', { body: msg, icon: '/icon-192.png', dir: 'rtl' });
-              }
-            });
-          });
-        }, i * 2000);
-      });
-
-      // Morning/evening reminder via browser Notification
-      if (settings.remindersEnabled) {
-        if (Notification.permission !== 'granted') {
-          Notification.requestPermission();
-        }
-        // Schedule morning reminder
-        function scheduleNotif(timeStr, title, body) {
-          const [h, m] = timeStr.split(':').map(Number);
-          const target = new Date();
-          target.setHours(h, m, 0, 0);
-          const delay = target - now;
-          if (delay > 0 && delay < 86400000) {
-            setTimeout(() => {
-              if (Notification.permission === 'granted') {
-                new Notification(title, { body, icon: '/icon-192.png', dir: 'rtl' });
-              }
-            }, delay);
-          }
-        }
-        scheduleNotif(
-          settings.morningReminder || '07:00',
-          'ביתילי — בדיקת בוקר',
-          `זמן לבדיקת בוקר לאחר ${settings.netz || '06:15'} (הנץ)`
-        );
-        scheduleNotif(
-          settings.eveningReminder || '19:00',
-          'ביתילי — בדיקה לפני השקיעה',
-          `זמן לבדיקה לפני השקיעה (${settings.shkia || '19:09'})`
-        );
-      }
-    } catch(e) { console.warn('reminder check:', e); }
-  }
-
-  // Request permission + check reminders when app opens
   await OneSignal.User.PushSubscription.optIn();
-  setTimeout(checkTodayReminders, 2000);
 });
-setInterval(() => {
-  if (navigator.serviceWorker?.controller) {
-    try {
-      const raw = localStorage.getItem('tahara-v3');
-      const settings = raw ? JSON.parse(raw).settings : null;
-      navigator.serviceWorker.controller.postMessage({type:'SCHEDULE_CHECK', settings});
-    } catch(e) {}
-  }
-}, 60000);
+</script>
+
+<script>
+// Service Worker registration
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', async () => {
+    await navigator.serviceWorker.register('/sw.js').catch(()=>{});
+
+    // Respond to SW requests for settings
+    navigator.serviceWorker.addEventListener('message', e => {
+      if (e.data?.type === 'GET_SETTINGS') {
+        try {
+          const raw = localStorage.getItem('tahara-v3');
+          const settings = raw ? JSON.parse(raw).settings : null;
+          e.ports[0].postMessage(settings);
+        } catch(err) { e.ports[0].postMessage(null); }
+      }
+    });
+
+    // Push settings to SW cache so notifications work when app is closed
+    function pushSettingsToSW() {
+      if (navigator.serviceWorker.controller) {
+        try {
+          const raw = localStorage.getItem('tahara-v3');
+          const settings = raw ? JSON.parse(raw).settings : null;
+          if (settings) navigator.serviceWorker.controller.postMessage({ type:'SAVE_SETTINGS', settings });
+        } catch(e) {}
+      }
+    }
+    setInterval(pushSettingsToSW, 30000);
+    setTimeout(pushSettingsToSW, 3000);
+  });
+}
 </script>
 </body>
 </html>
