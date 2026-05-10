@@ -9,14 +9,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Send notification tick
+        env:
+          OS_KEY: ${{ secrets.ONESIGNAL_REST_KEY }}
         run: |
-          curl -X POST https://onesignal.com/api/v1/notifications \
-            -H "Authorization: Key ${{ secrets.ONESIGNAL_REST_KEY }}" \
+          curl -s -X POST https://onesignal.com/api/v1/notifications \
+            -H "Authorization: Key ${OS_KEY}" \
             -H "Content-Type: application/json" \
-            -d '{
-              "app_id": "569868ca-1c94-4b39-a57b-1aa8ffdd3afb",
-              "included_segments": ["All"],
-              "contents": {"he": "בדיקה", "en": "check"},
-              "headings": {"he": "ביתילי", "en": "Beitili"},
-              "data": {"type": "tick", "silent": true}
-            }'
+            -d "{\"app_id\":\"569868ca-1c94-4b39-a57b-1aa8ffdd3afb\",\"included_segments\":[\"All\"],\"contents\":{\"he\":\"בדיקה\",\"en\":\"check\"},\"headings\":{\"he\":\"ביתילי\",\"en\":\"Beitili\"},\"data\":{\"type\":\"tick\",\"silent\":true}}"
