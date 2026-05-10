@@ -50,7 +50,6 @@ html,body{margin:0;padding:0;background:#3D1A2E;}
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 
-<!-- Pre-compiled app -->
 <script>
 (function(){
 const {useState,useEffect,useRef}=React;
@@ -5787,8 +5786,8 @@ Storage.prototype.setItem = function(key, val) {
 
 function setStatus(msg, spin) {
   document.getElementById('status-area').innerHTML = spin
-    ? `<div style="display:flex;flex-direction:column;align-items:center;gap:8px"><div class="spinner"></div><div class="status-txt">${msg}</div></div>`
-    : `<div class="status-txt">${msg}</div>`;
+    ? '<div style="display:flex;flex-direction:column;align-items:center;gap:8px"><div class="spinner"></div><div class="status-txt">'+msg+'</div></div>'
+    : '<div class="status-txt">'+msg+'</div>';
 }
 
 function doLogin() {
@@ -5808,43 +5807,58 @@ auth.onAuthStateChanged(async (user) => {
       const doc = await userDoc().get();
       if (doc.exists) _origSet(STORAGE_KEY, JSON.stringify(doc.data()));
     } catch(e) { console.warn('load:', e); }
-
-    // Tag OneSignal with UID for per-user notifications
-    if (window.OneSignalDeferred) {
-      window.OneSignalDeferred.push(function(OneSignal) {
-        OneSignal.login(user.uid).catch(()=>{});
-        OneSignal.User.addTag("uid", user.uid);
-      });
-    }
-
     document.getElementById('login-screen').style.display = 'none';
     const root = ReactDOM.createRoot(document.getElementById('root'));
     root.render(React.createElement(window.App));
+
+    // OneSignal: tag user and subscribe
+    window.OneSignalDeferred = window.OneSignalDeferred || [];
+    window.OneSignalDeferred.push(async function(OneSignal) {
+      try {
+        OneSignal.User.addTag("uid", user.uid);
+        await OneSignal.User.PushSubscription.optIn();
+        console.log("OneSignal subscribed");
+      } catch(e) { console.warn("OneSignal tag error:", e); }
+    });
   }
 });
+</script>
 
-// OneSignal init
+<!-- OneSignal init — must run before user interaction -->
+<script>
 window.OneSignalDeferred = window.OneSignalDeferred || [];
 OneSignalDeferred.push(async function(OneSignal) {
   await OneSignal.init({
     appId: "569868ca-1c94-4b39-a57b-1aa8ffdd3afb",
     safari_web_id: "web.onesignal.auto.20cc36d3-e742-47b9-8fc8-37c27a32926f",
-    notifyButton: { enable: false },
-    welcomeNotification: { disable: true },
+    notifyButton: { enable: true },
+    welcomeNotification: { disable: false, title: "ביתילי", message: "תודה שנרשמת להתראות!" },
+    promptOptions: {
+      slidedown: {
+        prompts: [{
+          type: "push",
+          autoPrompt: true,
+          text: {
+            actionMessage: "ביתילי רוצה לשלוח לך תזכורות בדיקות ווסתות",
+            acceptButton: "אפשרי",
+            cancelButton: "לא עכשיו"
+          },
+          delay: { timeDelay: 3 }
+        }]
+      }
+    }
   });
   await OneSignal.User.PushSubscription.optIn();
+  console.log("OneSignal initialized");
 });
 </script>
 
 <script>
-// Service Worker registration
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', async () => {
     await navigator.serviceWorker.register('/sw.js').catch(()=>{});
-
-    // Respond to SW requests for settings
     navigator.serviceWorker.addEventListener('message', e => {
-      if (e.data?.type === 'GET_SETTINGS') {
+      if (e.data && e.data.type === 'GET_SETTINGS') {
         try {
           const raw = localStorage.getItem('tahara-v3');
           const settings = raw ? JSON.parse(raw).settings : null;
@@ -5852,8 +5866,6 @@ if ('serviceWorker' in navigator) {
         } catch(err) { e.ports[0].postMessage(null); }
       }
     });
-
-    // Push settings to SW cache so notifications work when app is closed
     function pushSettingsToSW() {
       if (navigator.serviceWorker.controller) {
         try {
