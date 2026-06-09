@@ -851,7 +851,7 @@ function App() {
     setPinUnlocked: setPinUnlocked,
     cycles: cycles,
     refreshSunTimes: refreshSunTimes
-  })), /*#__PURE__*/React.createElement("div", {
+  })), /*#__PURE__*/React.createElement(InstallBanner, null), /*#__PURE__*/React.createElement("div", {
     style: {
       position: "fixed",
       bottom: 0,
@@ -2310,6 +2310,231 @@ function AppIcon({
     strokeWidth: strokeWidth * 0.9
   }));
   return null;
+}
+
+// ─── INSTALL & NOTIFICATION BANNER ───────────
+function InstallBanner() {
+  var _Notification;
+  const [showAndroid, setShowAndroid] = useState(false);
+  const [showIphone, setShowIphone] = useState(false);
+  const [deferredPrompt, setDeferred] = useState(null);
+  const [notifStatus, setNotifStatus] = useState(((_Notification = Notification) === null || _Notification === void 0 ? void 0 : _Notification.permission) || 'default');
+  const isIos = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+  const isAndroid = /Android/i.test(navigator.userAgent);
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+  useEffect(() => {
+    window.addEventListener('beforeinstallprompt', e => {
+      e.preventDefault();
+      setDeferred(e);
+      setShowAndroid(true);
+    });
+  }, []);
+  async function installAndroid() {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const {
+      outcome
+    } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') setShowAndroid(false);
+  }
+  async function enableNotifications() {
+    // Must be called from user gesture
+    try {
+      const perm = await Notification.requestPermission();
+      setNotifStatus(perm);
+      if (perm === 'granted' && window.OneSignalDeferred) {
+        window.OneSignalDeferred.push(async OS => {
+          await OS.User.PushSubscription.optIn();
+        });
+      }
+    } catch (e) {
+      console.warn(e);
+    }
+  }
+  if (isStandalone) return null;
+  return /*#__PURE__*/React.createElement(React.Fragment, null, showAndroid && isAndroid && /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: 'fixed',
+      bottom: 90,
+      right: 12,
+      left: 12,
+      zIndex: 500,
+      background: 'linear-gradient(135deg,#3D1A2E,#6B2D4A)',
+      borderRadius: 16,
+      padding: '14px 16px',
+      boxShadow: '0 8px 32px rgba(0,0,0,0.35)',
+      display: 'flex',
+      alignItems: 'center',
+      gap: 12
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 40,
+      height: 40,
+      borderRadius: 10,
+      background: 'white',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexShrink: 0
+    }
+  }, /*#__PURE__*/React.createElement("img", {
+    src: "/icon-192.png",
+    width: 32,
+    height: 32,
+    style: {
+      borderRadius: 8
+    }
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 700,
+      fontSize: 13,
+      color: 'white',
+      fontFamily: "'Secular One',sans-serif"
+    }
+  }, "\u05D4\u05EA\u05E7\u05D9\u05E0\u05D9 \u05D0\u05EA \u05D1\u05D9\u05EA\u05D9\u05DC\u05D9"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: 'rgba(255,255,255,0.7)',
+      marginTop: 2
+    }
+  }, "\u05D2\u05D9\u05E9\u05D4 \u05DE\u05D4\u05D9\u05E8\u05D4 \u05DE\u05D4\u05DE\u05E1\u05DA \u05D4\u05D1\u05D9\u05EA")), /*#__PURE__*/React.createElement("button", {
+    onClick: installAndroid,
+    style: {
+      background: '#B8922A',
+      color: 'white',
+      border: 'none',
+      borderRadius: 20,
+      padding: '7px 14px',
+      fontSize: 12,
+      fontWeight: 700,
+      cursor: 'pointer',
+      whiteSpace: 'nowrap'
+    }
+  }, "\u05D4\u05EA\u05E7\u05DF"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setShowAndroid(false),
+    style: {
+      background: 'none',
+      border: 'none',
+      color: 'rgba(255,255,255,0.5)',
+      cursor: 'pointer',
+      fontSize: 16,
+      padding: 4
+    }
+  }, "\u2715")), isIos && !isStandalone && /*#__PURE__*/React.createElement("div", {
+    style: {
+      margin: '0 16px 12px',
+      background: 'linear-gradient(135deg,#F5EEF8,#EDE0F5)',
+      borderRadius: 14,
+      padding: '12px 14px',
+      border: '1px solid #C8A8E0'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: 8,
+      marginBottom: 8
+    }
+  }, /*#__PURE__*/React.createElement("svg", {
+    width: "18",
+    height: "18",
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "#6B2D4A",
+    strokeWidth: "2",
+    strokeLinecap: "round"
+  }, /*#__PURE__*/React.createElement("rect", {
+    x: "5",
+    y: "2",
+    width: "14",
+    height: "20",
+    rx: "2"
+  }), /*#__PURE__*/React.createElement("line", {
+    x1: "12",
+    y1: "18",
+    x2: "12",
+    y2: "18.5",
+    strokeWidth: "3"
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 700,
+      fontSize: 13,
+      color: '#3D1A2E',
+      fontFamily: "'Secular One',sans-serif"
+    }
+  }, "\u05D4\u05D5\u05E1\u05E4\u05D4 \u05DC\u05DE\u05E1\u05DA \u05D4\u05D1\u05D9\u05EA (iPhone)")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: '#5A3060',
+      lineHeight: 1.8
+    }
+  }, "1. \u05DC\u05D7\u05E6\u05D9 \u05E2\u05DC \u05DB\u05E4\u05EA\u05D5\u05E8 \u05D4\u05E9\u05D9\u05EA\u05D5\u05E3 ", /*#__PURE__*/React.createElement("strong", null, "\u2B06"), " \u05D1\u05EA\u05D7\u05EA\u05D9\u05EA Safari", /*#__PURE__*/React.createElement("br", null), "2. \u05D1\u05D7\u05E8\u05D9 ", /*#__PURE__*/React.createElement("strong", null, "\"Add to Home Screen\""), /*#__PURE__*/React.createElement("br", null), "3. \u05DC\u05D7\u05E6\u05D9 ", /*#__PURE__*/React.createElement("strong", null, "\"Add\""), " \u2014 \u05D1\u05D9\u05EA\u05D9\u05DC\u05D9 \u05EA\u05D5\u05E4\u05D9\u05E2 \u05DB\u05D0\u05E4\u05DC\u05D9\u05E7\u05E6\u05D9\u05D4")), notifStatus !== 'granted' && !isIos && /*#__PURE__*/React.createElement("div", {
+    style: {
+      margin: '0 16px 12px',
+      background: 'linear-gradient(135deg,#EBF5EE,#D4EDE0)',
+      borderRadius: 14,
+      padding: '12px 14px',
+      border: '1px solid #5A9B72',
+      display: 'flex',
+      alignItems: 'center',
+      gap: 10
+    }
+  }, /*#__PURE__*/React.createElement("svg", {
+    width: "20",
+    height: "20",
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "#3A6B50",
+    strokeWidth: "2",
+    strokeLinecap: "round"
+  }, /*#__PURE__*/React.createElement("path", {
+    d: "M6 10C6 6.7 8.7 4 12 4C15.3 4 18 6.7 18 10L18 16L6 16z",
+    fill: "none"
+  }), /*#__PURE__*/React.createElement("line", {
+    x1: "4",
+    y1: "16",
+    x2: "20",
+    y2: "16"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M10 16a2 2 0 0 0 4 0"
+  }), /*#__PURE__*/React.createElement("line", {
+    x1: "12",
+    y1: "2",
+    x2: "12",
+    y2: "4"
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 600,
+      fontSize: 12,
+      color: '#2A5040'
+    }
+  }, "\u05D4\u05E4\u05E2\u05DC\u05EA \u05D4\u05EA\u05E8\u05D0\u05D5\u05EA"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: '#5A7060'
+    }
+  }, "\u05E7\u05D1\u05DC\u05D9 \u05EA\u05D6\u05DB\u05D5\u05E8\u05D5\u05EA \u05DC\u05D1\u05D3\u05D9\u05E7\u05D5\u05EA \u05D5\u05D5\u05E1\u05EA\u05D5\u05EA")), /*#__PURE__*/React.createElement("button", {
+    onClick: enableNotifications,
+    style: {
+      background: '#3A6B50',
+      color: 'white',
+      border: 'none',
+      borderRadius: 18,
+      padding: '7px 14px',
+      fontSize: 12,
+      fontWeight: 700,
+      cursor: 'pointer'
+    }
+  }, "\u05D4\u05E4\u05E2\u05DC\u05D9")));
 }
 
 // ─── CALENDAR VIEW ───────────────────────────
@@ -5821,45 +6046,20 @@ auth.onAuthStateChanged(async (user) => {
     document.getElementById('login-screen').style.display = 'none';
     const root = ReactDOM.createRoot(document.getElementById('root'));
     root.render(React.createElement(window.App));
-
-    // OneSignal: tag user and subscribe
-    window.OneSignalDeferred = window.OneSignalDeferred || [];
-    window.OneSignalDeferred.push(async function(OneSignal) {
-      try {
-        OneSignal.User.addTag("uid", user.uid);
-        await OneSignal.User.PushSubscription.optIn();
-        console.log("OneSignal subscribed");
-      } catch(e) { console.warn("OneSignal tag error:", e); }
-    });
   }
 });
 </script>
 
-<!-- OneSignal init — must run before user interaction -->
+<!-- OneSignal -->
 <script>
 window.OneSignalDeferred = window.OneSignalDeferred || [];
 OneSignalDeferred.push(async function(OneSignal) {
   await OneSignal.init({
     appId: "569868ca-1c94-4b39-a57b-1aa8ffdd3afb",
     safari_web_id: "web.onesignal.auto.20cc36d3-e742-47b9-8fc8-37c27a32926f",
-    notifyButton: { enable: true },
-    welcomeNotification: { disable: false, title: "ביתילי", message: "תודה שנרשמת להתראות!" },
-    promptOptions: {
-      slidedown: {
-        prompts: [{
-          type: "push",
-          autoPrompt: true,
-          text: {
-            actionMessage: "ביתילי רוצה לשלוח לך תזכורות בדיקות ווסתות",
-            acceptButton: "אפשרי",
-            cancelButton: "לא עכשיו"
-          },
-          delay: { timeDelay: 3 }
-        }]
-      }
-    }
+    notifyButton: { enable: false },
+    welcomeNotification: { disable: true },
   });
-  await OneSignal.User.PushSubscription.optIn();
   console.log("OneSignal initialized");
 });
 </script>
